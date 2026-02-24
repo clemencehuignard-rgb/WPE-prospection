@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WPE Solutions — Prospection Cosmétique</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="
+  var s=document.createElement('script');
+  s.src='https://unpkg.com/@supabase/supabase-js@2';
+  s.onerror=function(){document.getElementById('cdn-error').style.display='block'};
+  document.head.appendChild(s);
+"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; color: #2c2c2c; min-height: 100vh; }
+
+  /* SETUP SCREEN */
+  #setup-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f5f5f5; }
+  .setup-box { background: #ffffff; border-radius: 16px; padding: 40px; width: 520px; border: 1px solid #e0e0e0; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  .setup-box h1 { color: #e94560; font-size: 20px; margin-bottom: 6px; letter-spacing: 2px; }
+  .setup-box .sub { color: #888; font-size: 12px; margin-bottom: 28px; }
+  .setup-field { margin-bottom: 16px; }
+  .setup-field label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+  .setup-field input { width: 100%; background: #f8f9fc; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; color: #2c2c2c; font-size: 12px; font-family: 'Courier New', monospace; }
+  .setup-field input:focus { outline: none; border-color: #e94560; }
+  .setup-btn { width: 100%; background: #e94560; color: #fff; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .setup-btn:hover { background: #c73e54; }
+  .setup-help { background: #fef7f8; border-radius: 8px; padding: 14px; margin-top: 20px; font-size: 11px; color: #888; line-height: 1.8; }
+  .setup-help code { color: #e94560; background: rgba(233,69,96,0.08); padding: 1px 5px; border-radius: 3px; font-size: 10px; }
+  .setup-error { background: rgba(239,68,68,0.08); border: 1px solid #EF4444; border-radius: 6px; padding: 10px 14px; margin-top: 12px; font-size: 11px; color: #EF4444; display: none; }
+
+  /* LOADING */
+  #loading-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; gap: 16px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid rgba(233,69,96,0.2); border-top-color: #e94560; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MAIN APP */
+  #app { display: none; }
+
+  /* HEADER */
+  header { background: linear-gradient(135deg, #1a1a2e, #0f3460); padding: 16px 30px; border-bottom: 3px solid #e94560; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 20px; color: #fff; letter-spacing: 2px; font-weight: 700; }
+  header .subtitle { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .stats-header { display: flex; gap: 12px; }
+  .stat-pill { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 20px; padding: 5px 14px; text-align: center; }
+  .stat-pill .val { font-size: 16px; font-weight: 700; color: #fff; }
+  .stat-pill .lbl { font-size: 9px; color: rgba(255,255,255,0.6); }
+  .sync-status { font-size: 10px; color: #06D6A0; display: flex; align-items: center; gap: 5px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #06D6A0; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+  .btn-reset { font-size: 10px; color: rgba(255,255,255,0.5); background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  .btn-reset:hover { color: #EF4444; border-color: #EF4444; }
+
+  /* TABS */
+  .tabs { display: flex; border-bottom: 1px solid #e0e0e0; background: #fff; }
+  .tab { padding: 12px 22px; cursor: pointer; font-size: 13px; color: #888; border-bottom: 3px solid transparent; transition: all .2s; }
+  .tab.active { color: #e94560; border-bottom-color: #e94560; background: #fff; }
+  .tab:hover:not(.active) { color: #2c2c2c; background: #fafafa; }
+
+  /* PANELS */
+  .panel { display: none; padding: 24px 30px; }
+  .panel.active { display: block; }
+
+  /* KANBAN */
+  .kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .column { background: #f0f1f3; border-radius: 10px; padding: 12px; min-height: 400px; }
+  .col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid; display: flex; justify-content: space-between; align-items: center; }
+  .col-a-contacter { border-color: #7BA7BC; color: #7BA7BC; }
+  .col-contacte { border-color: #F59E0B; color: #F59E0B; }
+  .col-engage { border-color: #8B5CF6; color: #8B5CF6; }
+  .col-en-conversation { border-color: #06D6A0; color: #06D6A0; }
+  .col-qualifie { border-color: #e94560; color: #e94560; }
+  .col-count { background: rgba(0,0,0,0.08); border-radius: 10px; padding: 1px 7px; font-size: 10px; }
+
+  .card { background: #ffffff; border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 3px solid transparent; transition: all .2s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .card.tier1 { border-left-color: #06D6A0; }
+  .card.tier2 { border-left-color: #F59E0B; }
+  .card.tier3 { border-left-color: #EF4444; }
+  .card-name { font-size: 12px; font-weight: 700; color: #2c2c2c; margin-bottom: 4px; }
+  .card-contact { font-size: 10px; color: #888; }
+  .card-score { font-size: 10px; color: #e94560; margin-top: 4px; font-weight: 600; }
+  .card-note { font-size: 10px; color: #aaa; margin-top: 6px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tier-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; float: right; }
+  .tier-badge.t1 { background: rgba(6,214,160,0.15); color: #059669; }
+  .tier-badge.t2 { background: rgba(245,158,11,0.15); color: #D97706; }
+  .tier-badge.t3 { background: rgba(239,68,68,0.15); color: #DC2626; }
+  .segment-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+  .seg-luxury_premium, .seg-premium_luxury { background: rgba(233,69,96,0.1); color: #e94560; }
+  .seg-clean_beauty { background: rgba(6,214,160,0.1); color: #059669; }
+  .seg-indie_emergent, .seg-indie_emerging { background: rgba(245,158,11,0.1); color: #D97706; }
+  .seg-fragrance { background: rgba(139,92,246,0.1); color: #7C3AED; }
+  .seg-skincare { background: rgba(0,180,216,0.1); color: #0891B2; }
+  .empty-col { text-align: center; color: #ccc; font-size: 11px; padding: 20px 0; }
+  .suivi-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+  .suivi-marc { background: rgba(59,130,246,0.12); color: #2563EB; }
+  .suivi-clemence { background: rgba(168,85,247,0.12); color: #7C3AED; }
+  .user-selector { display: flex; align-items: center; gap: 6px; }
+  .user-selector label { font-size: 10px; color: rgba(255,255,255,0.6); }
+  .user-selector select { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 4px 8px; color: #fff; font-size: 11px; cursor: pointer; }
+  .user-selector select option { color: #2c2c2c; background: #fff; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #ffffff; border-radius: 12px; padding: 28px; width: 650px; max-height: 85vh; overflow-y: auto; border: 1px solid #e0e0e0; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+  .modal h2 { color: #e94560; font-size: 16px; margin-bottom: 20px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .field label { font-size: 11px; color: #888; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input, .field select, .field textarea { width: 100%; background: #f8f9fc; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; color: #2c2c2c; font-size: 12px; font-family: inherit; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #e94560; }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field.full { grid-column: 1 / -1; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .btn { padding: 8px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .2s; }
+  .btn-primary { background: #e94560; color: #fff; }
+  .btn-primary:hover { background: #c73e54; }
+  .btn-danger { background: rgba(239,68,68,0.08); color: #EF4444; border: 1px solid #EF4444; }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+  .btn-secondary { background: #f0f0f0; color: #666; border: 1px solid #ddd; }
+  .btn-secondary:hover { background: #e0e0e0; }
+  .btn-email { background: rgba(233,69,96,0.08); color: #e94560; border: 1px solid #e94560; font-size: 11px; padding: 5px 12px; }
+
+  /* LIST VIEW */
+  .prospect-list { background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e0e0e0; }
+  .prospect-list-header { display: grid; grid-template-columns: 2fr 1fr 0.8fr 1.2fr 0.6fr 1fr 0.6fr 0.8fr 80px; padding: 12px 16px; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e0e0e0; background: #fafafa; }
+  .prospect-row { display: grid; grid-template-columns: 2fr 1fr 0.8fr 1.2fr 0.6fr 1fr 0.6fr 0.8fr 80px; padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f0f0f0; align-items: center; transition: background .15s; cursor: pointer; }
+  .prospect-row:hover { background: #fef7f8; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot-a-contacter { background: #7BA7BC; }
+  .dot-contacte { background: #F59E0B; }
+  .dot-engage { background: #8B5CF6; }
+  .dot-en-conversation { background: #06D6A0; }
+  .dot-qualifie { background: #e94560; }
+
+  /* TEMPLATES */
+  .template-card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; border-left: 3px solid #e94560; border: 1px solid #e0e0e0; border-left: 3px solid #e94560; }
+  .template-card h3 { color: #e94560; font-size: 13px; margin-bottom: 6px; }
+  .template-card .target { font-size: 11px; color: #888; margin-bottom: 12px; }
+  .template-body { background: #f8f9fc; border-radius: 6px; padding: 14px; font-size: 11px; color: #555; white-space: pre-wrap; line-height: 1.7; font-family: 'Courier New', monospace; max-height: 280px; overflow-y: auto; }
+  .copy-btn { margin-top: 10px; font-size: 11px; }
+  .copied { color: #06D6A0 !important; border-color: #06D6A0 !important; background: rgba(6,214,160,0.08) !important; }
+
+  /* MISC */
+  .search-bar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+  .search-bar input { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px 14px; color: #2c2c2c; font-size: 12px; width: 260px; }
+  .search-bar input:focus { outline: none; border-color: #e94560; }
+  .filter-btn { padding: 7px 14px; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #888; cursor: pointer; font-size: 11px; transition: all .2s; }
+  .filter-btn.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.06); }
+  .section-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .add-btn { position: fixed; bottom: 30px; right: 30px; background: #e94560; color: #fff; border: none; border-radius: 50px; padding: 14px 24px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(233,69,96,0.35); transition: all .2s; z-index: 100; }
+  .add-btn:hover { transform: scale(1.05); box-shadow: 0 6px 28px rgba(233,69,96,0.5); }
+  .toast { position: fixed; bottom: 90px; right: 30px; background: #06D6A0; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 700; z-index: 200; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  #cdn-error { display: none; }
+  #cdn-error code { background: #f0f0f0; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- CDN ERROR -->
+<div id="cdn-error" style="display:none;position:fixed;inset:0;z-index:9999;background:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;padding:40px;text-align:center;">
+  <h1 style="color:#e94560;font-size:22px;margin-bottom:12px;">Impossible de charger l'application</h1>
+  <p style="color:#555;font-size:14px;max-width:500px;line-height:1.8;">
+    Le navigateur bloque le chargement des scripts externes.<br><br>
+    <strong>Solutions :</strong><br>
+    1. <strong>Ouvrir via un serveur local</strong> : dans le dossier du fichier, lancer <code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">python -m http.server 8080</code> puis ouvrir <a href="http://localhost:8080" style="color:#e94560">http://localhost:8080</a><br>
+    2. <strong>Utiliser Chrome</strong> avec le flag <code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">--allow-file-access-from-files</code><br>
+    3. <strong>Demander le lien hébergé</strong> à Clémence
+  </p>
+</div>
+
+<!-- FILE PROTOCOL WARNING -->
+<div id="file-warning" style="display:none;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:10px 20px;font-size:12px;color:#92400E;text-align:center;">
+  &#9888; Fichier ouvert en local (file://) — Si l'outil ne charge pas, essayez de l'ouvrir via <strong>python -m http.server 8080</strong> ou demandez le lien hébergé.
+  <button onclick="this.parentElement.style.display='none'" style="margin-left:12px;background:none;border:1px solid #D97706;border-radius:4px;padding:2px 8px;cursor:pointer;color:#92400E;font-size:11px;">Fermer</button>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-box">
+    <h1>WPE SOLUTIONS</h1>
+    <div class="sub">Configuration Supabase — Prospection Cosmétique</div>
+
+    <div class="setup-field">
+      <label>Supabase Project URL</label>
+      <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+    </div>
+    <div class="setup-field">
+      <label>Supabase Anon Key</label>
+      <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+    </div>
+    <button class="setup-btn" onclick="connectSupabase()">Se connecter</button>
+    <div class="setup-error" id="setup-error"></div>
+
+    <div class="setup-help">
+      <strong style="color:#e94560">Comment obtenir ces informations ?</strong><br>
+      1. Va sur <code>supabase.com</code> &rarr; ton projet<br>
+      2. Menu gauche &rarr; <code>Settings</code> &rarr; <code>API</code><br>
+      3. Copie <code>Project URL</code> et <code>anon public</code> key<br><br>
+      <strong style="color:#e94560">Créer la table (SQL Editor) :</strong><br>
+      Colle et exécute le SQL ci-dessous dans <code>SQL Editor</code> de Supabase :
+      <div style="margin-top:8px;background:#1a1a2e;border-radius:6px;padding:10px;font-family:'Courier New';font-size:10px;color:#06D6A0;line-height:1.8;">
+create table prospects (<br>
+&nbsp;&nbsp;id bigserial primary key,<br>
+&nbsp;&nbsp;nom text not null,<br>
+&nbsp;&nbsp;segment text default 'luxury_premium',<br>
+&nbsp;&nbsp;pays text default 'France',<br>
+&nbsp;&nbsp;contact text,<br>
+&nbsp;&nbsp;email text,<br>
+&nbsp;&nbsp;tel text,<br>
+&nbsp;&nbsp;linkedin text,<br>
+&nbsp;&nbsp;score integer default 0,<br>
+&nbsp;&nbsp;tier text default '2',<br>
+&nbsp;&nbsp;statut text default 'a-contacter',<br>
+&nbsp;&nbsp;notes text,<br>
+&nbsp;&nbsp;site text,<br>
+&nbsp;&nbsp;next_contact date,<br>
+&nbsp;&nbsp;created_at timestamptz default now()<br>
+);<br>
+alter table prospects enable row level security;<br>
+create policy "public_all" on prospects for all using (true) with check (true);
+      </div>
+      <button class="btn btn-email" style="margin-top:8px;font-size:10px;" onclick="copySql()">Copier le SQL</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div style="color:#7BA7BC;font-size:12px;">Connexion à Supabase...</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+<header>
+  <div>
+    <h1>WPE SOLUTIONS — PROSPECTION COSMÉTIQUE</h1>
+    <div class="subtitle">Marques cosmétiques premium — Formulation sur mesure</div>
+  </div>
+  <div class="header-right">
+    <div class="sync-status">
+      <div class="sync-dot"></div>
+      Synchronisé en temps réel
+    </div>
+    <div class="stats-header">
+      <div class="stat-pill"><div class="val" id="stat-total">0</div><div class="lbl">Prospects</div></div>
+      <div class="stat-pill"><div class="val" id="stat-contactes">0</div><div class="lbl">Contactés</div></div>
+      <div class="stat-pill"><div class="val" id="stat-qualifies">0</div><div class="lbl">Qualifiés</div></div>
+      <div class="stat-pill"><div class="val" id="stat-conv">0%</div><div class="lbl">Taux conv.</div></div>
+    </div>
+    <div class="user-selector">
+      <label>Suivi :</label>
+      <select id="user-filter" onchange="renderAll()">
+        <option value="">Tous</option>
+        <option value="Clémence">Clémence</option>
+        <option value="Marc">Marc</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetConfig()">Reconfigurer</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('kanban', this)">Pipeline</div>
+  <div class="tab" onclick="switchTab('liste', this)">Liste</div>
+  <div class="tab" onclick="switchTab('templates', this)">Templates Email</div>
+</div>
+
+<!-- KANBAN -->
+<div id="panel-kanban" class="panel active">
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Rechercher une marque..." oninput="renderAll()">
+    <button class="filter-btn active" onclick="setFilter('all', this)">Tous</button>
+    <button class="filter-btn" onclick="setFilter('1', this)">Tier 1</button>
+    <button class="filter-btn" onclick="setFilter('2', this)">Tier 2</button>
+    <button class="filter-btn" onclick="setFilter('3', this)">Tier 3</button>
+  </div>
+  <div class="kanban" id="kanban-board"></div>
+</div>
+
+<!-- LISTE -->
+<div id="panel-liste" class="panel">
+  <div class="prospect-list">
+    <div class="prospect-list-header">
+      <div>Entreprise</div><div>Segment</div><div>Pays</div><div>Contact</div><div>Tier</div><div>Statut</div><div>Score</div><div>Suivi par</div><div>Actions</div>
+    </div>
+    <div id="list-rows"></div>
+  </div>
+</div>
+
+<!-- TEMPLATES -->
+<div id="panel-templates" class="panel">
+  <div class="section-title">Templates Email — Copier-Coller</div>
+
+  <div class="template-card">
+    <h3>Template 1 — Premier contact (Luxury / Premium)</h3>
+    <div class="target">Cibles : marques luxe, premium, grandes maisons</div>
+    <div class="template-body" id="tpl1">Objet : WPE × [Marque] — Innovation formulation cosmétique naturelle
+
+Bonjour [Prénom],
+
+Je me permets de vous contacter au sujet d'une collaboration entre WPE Solutions et [Marque].
+
+WPE a développé une technologie brevetée de microémulsions haute pression permettant de créer des formulations cosmétiques 100% naturelles et sans alcool — avec une efficacité prouvée en termes de pénétration des actifs et de rémanence olfactive.
+
+Nos atouts :
+• Formulations 100% naturelles, sans conservateurs synthétiques
+• Technologie brevetée — microémulsions haute pression
+• Brumes, sérums et laits — textures sensorielles uniques
+• Développement clé en main : formulation → tests → dossier réglementaire
+• Made in France, positionnement premium
+
+Seriez-vous disponible pour un échange de 20 minutes ?
+
+Cordialement,
+Clémence Huignard — WPE Solutions
+clemence.huignard@wpesolutions.fr</div>
+    <button class="btn btn-email copy-btn" onclick="copyTemplate('tpl1', this)">Copier</button>
+  </div>
+
+  <div class="template-card">
+    <h3>Template 2 — Clean Beauty / Indie</h3>
+    <div class="target">Cibles : marques clean beauty, indie en croissance, naturel</div>
+    <div class="template-body" id="tpl2">Objet : Formulation naturelle innovante pour [Marque]
+
+Bonjour [Prénom],
+
+[Marque] incarne parfaitement les valeurs de la clean beauty, et c'est ce qui m'a motivée à vous écrire.
+
+WPE Solutions propose une technologie brevetée unique : des microémulsions haute pression qui permettent de formuler des cosmétiques 100% naturels, sans alcool et sans conservateurs synthétiques.
+
+Ce qui pourrait vous intéresser :
+• Brumes visage/corps sans alcool — hydratation + soin
+• Innocuité parfaite — idéal peaux sensibles et réactives
+• Galéniques innovantes que vos clients n'ont jamais vues
+• Développement sur mesure, du concept au produit fini
+
+Un échange rapide pour en discuter ?
+
+Cordialement,
+Clémence Huignard — WPE Solutions
+clemence.huignard@wpesolutions.fr</div>
+    <button class="btn btn-email copy-btn" onclick="copyTemplate('tpl2', this)">Copier</button>
+  </div>
+
+  <div class="template-card">
+    <h3>Template 3 — Relance J+7</h3>
+    <div class="target">Cibles : tous prospects sans réponse après 7 jours</div>
+    <div class="template-body" id="tpl3">Objet : Re: WPE × [Marque] — Suite
+
+Bonjour [Prénom],
+
+Je reviens vers vous suite à mon précédent message.
+
+Question directe : avez-vous 20 minutes cette semaine pour découvrir comment notre technologie brevetée pourrait enrichir votre gamme avec des textures sensorielles inédites ?
+
+En résumé :
+→ 100% naturel, sans alcool, sans conservateurs
+→ Brumes, sérums, laits — Made in France
+→ Développement clé en main
+
+Bien cordialement,
+Clémence Huignard — WPE Solutions</div>
+    <button class="btn btn-email copy-btn" onclick="copyTemplate('tpl3', this)">Copier</button>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">Nouveau prospect</h2>
+    <div class="modal-grid">
+      <div class="field"><label>Nom de l'entreprise</label><input type="text" id="f-nom"></div>
+      <div class="field">
+        <label>Segment</label>
+        <select id="f-segment">
+          <option value="luxury_premium">Luxury / Premium</option>
+          <option value="clean_beauty">Clean Beauty</option>
+          <option value="indie_emergent">Indie / Émergent</option>
+          <option value="fragrance">Fragrance</option>
+          <option value="skincare">Skincare</option>
+        </select>
+      </div>
+      <div class="field"><label>Pays</label><input type="text" id="f-pays" value="France"></div>
+      <div class="field"><label>Contact (nom + rôle)</label><input type="text" id="f-contact"></div>
+      <div class="field"><label>Email</label><input type="text" id="f-email"></div>
+      <div class="field"><label>Téléphone</label><input type="text" id="f-tel"></div>
+      <div class="field"><label>LinkedIn</label><input type="text" id="f-linkedin"></div>
+      <div class="field"><label>Score (0-110)</label><input type="number" id="f-score" min="0" max="110" value="0"></div>
+      <div class="field">
+        <label>Tier priorité</label>
+        <select id="f-tier">
+          <option value="1">Tier 1 — Prioritaire</option>
+          <option value="2" selected>Tier 2 — Secondaire</option>
+          <option value="3">Tier 3 — Faible</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Statut</label>
+        <select id="f-statut">
+          <option value="a-contacter">À contacter</option>
+          <option value="contacte">Contacté</option>
+          <option value="engage">Engagé</option>
+          <option value="en-conversation">En conversation</option>
+          <option value="qualifie">Qualifié</option>
+        </select>
+      </div>
+      <div class="field"><label>Site web</label><input type="text" id="f-site"></div>
+      <div class="field">
+        <label>Suivi par</label>
+        <select id="f-suivi">
+          <option value="">— Non assigné —</option>
+          <option value="Clémence">Clémence</option>
+          <option value="Marc">Marc</option>
+        </select>
+      </div>
+      <div class="field"><label>Date prochain contact</label><input type="date" id="f-next"></div>
+      <div class="field full"><label>Notes / Historique</label><textarea id="f-notes" rows="3"></textarea></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" id="btn-delete" onclick="deleteProspect()" style="display:none">Supprimer</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveProspect()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<button class="add-btn" onclick="openModal()" style="display:none" id="fab">+ Nouveau prospect</button>
+<div class="toast" id="toast"></div>
+
+<script>
+const SQL_CREATE = `create table prospects (
+  id bigserial primary key,
+  nom text not null,
+  segment text default 'luxury_premium',
+  pays text default 'France',
+  contact text,
+  email text,
+  tel text,
+  linkedin text,
+  score integer default 0,
+  tier text default '2',
+  statut text default 'a-contacter',
+  notes text,
+  site text,
+  next_contact date,
+  created_at timestamptz default now()
+);
+alter table prospects enable row level security;
+create policy "public_all" on prospects for all using (true) with check (true);`;
+
+const DEFAULT_PROSPECTS = [{"nom": "YSL Beauty Official", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 90, "tier": "1", "statut": "a-contacter", "notes": "", "site": "https://www.yslbeauty.com/"}, {"nom": "Lancôme Official", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 90, "tier": "1", "statut": "a-contacter", "notes": "", "site": "http://lancome.com/"}, {"nom": "Hermès", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 90, "tier": "1", "statut": "a-contacter", "notes": "", "site": "http://h.fr/Hermes"}, {"nom": "Givaudan", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Robertet", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Takasago", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "IFF", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Firmenich", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "La Prairie", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 75, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Oh My Cream", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 70, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.ohmycream.com"}, {"nom": "Luxe Paris", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 68, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://luxeparis.fr"}, {"nom": "Sanoflore", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 67, "tier": "1", "statut": "a-contacter", "notes": "", "site": "https://www.sanoflore.fr"}, {"nom": "Typology", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": "https://www.typology.com"}, {"nom": "Narciso Rodriguez", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Jean Paul Gaultier", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Mugler", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Armani Beauty", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Glossier", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Sol de Janeiro", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "U Beauty", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Huda Beauty", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Augustinus Bader", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Sisley Neura", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 65, "tier": "1", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Nuxe", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 62, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.nuxe.com"}, {"nom": "ITO", "segment": "indie_emerging", "pays": "France", "contact": "Arnaud Barrault (Fondateur / Co-fondateur)", "email": "a.barrault@gmail.com", "tel": "+33 695248096", "linkedin": "", "score": 53, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://ito.com"}, {"nom": "Laboté", "segment": "indie_emerging", "pays": "France", "contact": "Laura Bonnot (Product Development Manager)", "email": "laura@labote.paris", "tel": "+33 0688426600", "linkedin": "", "score": 51, "tier": "3", "statut": "en-conversation", "notes": "", "site": "https://labote.com"}, {"nom": "Apia", "segment": "premium_luxury", "pays": "Morocco", "contact": "Abdelilah Daoudi (Pdg)", "email": "abdelilah.daoudi@apia.ma", "tel": "+212 661174584", "linkedin": "", "score": 50, "tier": "3", "statut": "contacte", "notes": "", "site": "https://apia.com"}, {"nom": "Annick Goutal", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 50, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Florence by Mills", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 50, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "By Rosie Jane", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 50, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Sephora Collection", "segment": "indie_emerging", "pays": "France", "contact": "Marine Nepveux (Global Omnichannel Business Controlling Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/marine-nepveux-2a6b90b", "score": 50, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LouvagnyLab", "segment": "indie_emerging", "pays": "France", "contact": "Camille Gaude (Chef de projet)", "email": "cgaude@louvagnylab.com", "tel": "+33 652918708", "linkedin": "", "score": 47, "tier": "3", "statut": "contacte", "notes": "", "site": "https://louvagnylab.com"}, {"nom": "BOUGIE ET SENTEUR", "segment": "premium_luxury", "pays": "France", "contact": "Mathieu BOUCHET (Commercial international)", "email": "mathieu.bouchet@bougieetsenteur.com", "tel": "+33 0497052373", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://bougieetsenteur.com"}, {"nom": "CONCEPT 4", "segment": "premium_luxury", "pays": "France", "contact": "Kate Harrison (Director of New Product Development & Marketing)", "email": "katie@concept4.net", "tel": "0085296257567", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://concept4.com"}, {"nom": "COSMED", "segment": "premium_luxury", "pays": "France", "contact": "Stephanie Miraton (Events Manager)", "email": "stephanie@cosmed.fr", "tel": "+33 625682736", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://cosmed.com"}, {"nom": "CUT BY FRED", "segment": "premium_luxury", "pays": "France", "contact": "Julie Thiercelin (Responsable Développement Produits)", "email": "julie@cutbyfred.com", "tel": "+33 676822923", "linkedin": "", "score": 46, "tier": "3", "statut": "en-conversation", "notes": "", "site": "https://cutbyfred.com"}, {"nom": "DADDY KATE", "segment": "premium_luxury", "pays": "France", "contact": "Christophe Moutier (Responsable)", "email": "christophe.moutier@daddykate.fr", "tel": "+33 86755026", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://daddykate.com"}, {"nom": "Dragonfly", "segment": "premium_luxury", "pays": "France", "contact": "Cabellec Corinne (Fondatrice)", "email": "corinne.cabellec@gmail.com", "tel": "+33 622611169", "linkedin": "", "score": 46, "tier": "3", "statut": "contacte", "notes": "", "site": "https://dragonfly.com"}, {"nom": "Neomist", "segment": "premium_luxury", "pays": "France", "contact": "Louison Jolens (Responsable Marketing)", "email": "louisonjolens@gmail.com", "tel": "+33 782670691", "linkedin": "", "score": 46, "tier": "3", "statut": "contacte", "notes": "", "site": "https://neomist.com"}, {"nom": "Progress Info", "segment": "premium_luxury", "pays": "Tunisia", "contact": "Atef SFAR EL HANCHA (Gérant)", "email": "atefsfar@gmail.com", "tel": "+216 54345578", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://progressinfo.com"}, {"nom": "Tekniplex", "segment": "premium_luxury", "pays": "Belgium", "contact": "Yun Qi (Global Account Manager IPS)", "email": "Yun.Qi@tekni-plex.com", "tel": "+32 53650740", "linkedin": "", "score": 46, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://tekniplex.com"}, {"nom": "Vitry", "segment": "premium_luxury", "pays": "France", "contact": "Florian Hémidy (Responsable des affaires réglementaires)", "email": "fhemidy@vitry.com", "tel": "+33 40782784", "linkedin": "", "score": 46, "tier": "3", "statut": "contacte", "notes": "", "site": "https://vitry.com"}, {"nom": "COTY", "segment": "premium_luxury", "pays": "France", "contact": "victoria ENGEL (Skincare omnichannel Strategy Sr Director)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/victoria-engel-22079242", "score": 44, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://coty.com"}, {"nom": "Lalique", "segment": "premium_luxury", "pays": "Switzerland", "contact": "Christophe CALAIS (Director, Product Development & Procurement)", "email": "christophe.calais@lalique-beauty.com", "tel": "+41 793724984", "linkedin": "", "score": 42, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://lalique.com"}, {"nom": "Maison Francis Kurkdjian", "segment": "premium_luxury", "pays": "France", "contact": "Celia HANNON (Chef de projet développement packaging)", "email": "celia.hannon@franciskurkdjian.com", "tel": "+33 689105409", "linkedin": "", "score": 42, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://maisonfranciskurkdjian.com"}, {"nom": "Bvlgari", "segment": "premium_luxury", "pays": "Switzerland", "contact": "Safia Mouldi (Packaging development manager)", "email": "safia.mouldi@bulgari.com", "tel": "+41 782133671", "linkedin": "", "score": 40, "tier": "3", "statut": "contacte", "notes": "", "site": "https://bvlgari.com"}, {"nom": "Sisley Paris", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.sisley-paris.com"}, {"nom": "Guerlain", "segment": "premium_luxury", "pays": "France", "contact": "Carla Pieretti (Global Skincare Department Creative Responsible - Senior Art Director)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/carlapieretti", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.guerlain.com"}, {"nom": "Dior Beaute", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.dior.com"}, {"nom": "Givenchy Beauty", "segment": "premium_luxury", "pays": "France", "contact": "Contact Givenchy Beauty (A qualifier)", "email": "contact@givenchy.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.givenchy.com"}, {"nom": "Yves Saint Laurent Beaute", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.yslbeauty.com"}, {"nom": "Lancome", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.lancome.fr"}, {"nom": "Clarins", "segment": "premium_luxury", "pays": "France", "contact": "Alexia Hochart (Chef de projet coordination R&D maquillage)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/alexia-hochart-008255165", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.clarins.fr"}, {"nom": "Chanel Beaute", "segment": "premium_luxury", "pays": "France", "contact": "Hélène Demortain (Responsable de zone Nord-Est)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/h%C3%A9l%C3%A8ne-demortain-26354218", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.chanel.com"}, {"nom": "Hermes Beaute", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.hermes.com"}, {"nom": "Caron Paris", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.caron.com"}, {"nom": "Boucheron", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.boucheron.com"}, {"nom": "Van Cleef Arpels Beaute", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.vancleefarpels.com"}, {"nom": "Caudalie", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.caudalie.com"}, {"nom": "Biotherm", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.biotherm.fr"}, {"nom": "Payot", "segment": "premium_luxury", "pays": "France", "contact": "Contact Payot (A qualifier)", "email": "hello@payot.fr", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.payot.com"}, {"nom": "Roger Gallet", "segment": "premium_luxury", "pays": "France", "contact": "Contact Roger Gallet (A qualifier)", "email": "france@roger-gallet.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.roger-gallet.com"}, {"nom": "Lierac", "segment": "premium_luxury", "pays": "France", "contact": "Contact Lierac (A qualifier)", "email": "france@lierac.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.lierac.com"}, {"nom": "Decleor", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.decleor.fr"}, {"nom": "Filorga", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.laboratoire-filorga.com"}, {"nom": "Institut Esthederm", "segment": "premium_luxury", "pays": "France", "contact": "Contact Institut Esthederm (A qualifier)", "email": "esthederm@esthederm.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.esthederm.com"}, {"nom": "Aesop", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.aesop.com"}, {"nom": "Absolution", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.absolution-cosmetique.com"}, {"nom": "Pai Skincare", "segment": "clean_beauty", "pays": "France", "contact": "Contact Pai Skincare (A qualifier)", "email": "5060139722117_1_2025_awards_1_200x@2x.jpg", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.paiskincare.com"}, {"nom": "Weleda", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.weleda.fr"}, {"nom": "Dr Hauschka", "segment": "clean_beauty", "pays": "France", "contact": "Contact Dr Hauschka (A qualifier)", "email": "banniere-lp_epycurev2_800x800@2x.jpg", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.drhauschka.fr"}, {"nom": "Ilia Beauty", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.iliabeauty.com"}, {"nom": "RMS Beauty", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.rmsbeauty.com"}, {"nom": "Ere Perez", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.ereperez.com"}, {"nom": "True Botanicals", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.truebotanicals.com"}, {"nom": "Vintner Daughter", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.vintersdaughter.com"}, {"nom": "Odacite", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.odacite.com"}, {"nom": "Grown Alchemist", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.grownalchemist.com"}, {"nom": "Tata Harper", "segment": "clean_beauty", "pays": "France", "contact": "Contact Tata Harper (A qualifier)", "email": "info@tataharper.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.tataharperskincare.com"}, {"nom": "Circumference", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.circumferencelife.com"}, {"nom": "Agent Nateur", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.agentnateur.com"}, {"nom": "Diptyque", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.diptyqueparis.com"}, {"nom": "Memo Paris", "segment": "premium_luxury", "pays": "France", "contact": "Contact Memo Paris (A qualifier)", "email": "memo.fragrances@gmail.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.memoparis.com"}, {"nom": "Juliette Has A Gun", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.juliettehasa-gun.com"}, {"nom": "Maison Margiela Fragrances", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.maisonmargiela.com"}, {"nom": "Byredo", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.byredo.com"}, {"nom": "Le Labo", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.lelabofragrances.com"}, {"nom": "Frederic Malle", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.fredericmalle.com"}, {"nom": "Serge Lutens", "segment": "premium_luxury", "pays": "France", "contact": "Contact Serge Lutens (A qualifier)", "email": "contact@sergelutens.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.sergelutens.com"}, {"nom": "Atelier Cologne", "segment": "premium_luxury", "pays": "France", "contact": "Contact Atelier Cologne (A qualifier)", "email": "background@1x.jpg", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.ateliercologne.com"}, {"nom": "Make My Cream", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.makemycream.com"}, {"nom": "Joone Paris", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.joone.fr"}, {"nom": "Merci Handy", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.mercihandy.fr"}, {"nom": "Oh My Cream Skincare", "segment": "indie_emerging", "pays": "France", "contact": "Contact Oh My Cream Skincare (A qualifier)", "email": "contact@ohmycream.com", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.ohmycream.com"}, {"nom": "La Rosee", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.larosee.com"}, {"nom": "Respire", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.respire-beaute.com"}, {"nom": "Patyka", "segment": "clean_beauty", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.patyka.com"}, {"nom": "Au Gascon", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.augascon.com"}, {"nom": "MÊME Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": "https://www.memecosmetics.com"}, {"nom": "Roger&Gallet", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 40, "tier": "1", "statut": "a-contacter", "notes": "", "site": "http://fr.roger-gallet.com/"}, {"nom": "Eclo Beauty", "segment": "indie_emerging", "pays": "France", "contact": "Julien Callede (Co-Founder & Chairman)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/juliencallede", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "COSMETIC PACKAGING SOLUTIONS LTD.  / COSMETIC CONCEPTS 2 COUNTER", "segment": "indie_emerging", "pays": "France", "contact": "Navin Ullal (General Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/navin-ullal-5367ab17", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "La Nature en Textures", "segment": "indie_emerging", "pays": "France", "contact": "Frédérique Bellanger (Formulation cosmétique à façon)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/fr%C3%A9d%C3%A9rique-bellanger-7116062b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Laboratoires Expanscience", "segment": "indie_emerging", "pays": "France", "contact": "Céline BROUZES (Global Consumer & Market Insight Director | Data Officer Dermo-Cosmetics)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/c%C3%A9line-brouzes-", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "TikTok", "segment": "indie_emerging", "pays": "France", "contact": "Anne-Fleur Ménard (Brand Partnership Manager - Luxury Brands)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/anne-fleur-m%C3%A9nard21", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "SOPHIM", "segment": "indie_emerging", "pays": "France", "contact": "Stéphanie Gruselle (Responsable commerciale Marché France - Ingrédients cosmétiques)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/st%C3%A9phanie-gruselle-01a5833b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "MFI Parfums", "segment": "indie_emerging", "pays": "France", "contact": "Mohammed Fares (Directeur général)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/mohammedfares0998", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "AR2I", "segment": "indie_emerging", "pays": "France", "contact": "Flavie Belabre (Chargée de développement et fabrication cosmétique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/flavie-belabre-0a2b0710a", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "4CX - THE FRENCH BEAUTY COLLECTIVE", "segment": "indie_emerging", "pays": "France", "contact": "Remi LAVILLE (Membre du collectif 4CX - THE FRENCH BEAUTY COLLECTIVE)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/remilaville", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "BODYMATTERS HEALTH & BEAUTY LIMITED", "segment": "indie_emerging", "pays": "France", "contact": "Hua (Amy) Shui (Administrative Assistant)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/hua-amy-shui-b31b4035b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Infopro Digital", "segment": "indie_emerging", "pays": "France", "contact": "Jennifer Gioan (Responsable commerciale France sur les salons LUXE PACK)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/jennifer-gioan-1a661a19", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Oway", "segment": "indie_emerging", "pays": "France", "contact": "Samia Bouaziz-Dorbane (GLOBAL BEAUTY DIRECTOR)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/samia-bouaziz-dorbane-51466a1a", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "BeautyScale", "segment": "indie_emerging", "pays": "France", "contact": "Paul Chauveau (Co-Founder)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/paul-chauveau-309551113", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "INESSENS", "segment": "indie_emerging", "pays": "France", "contact": "Vincent JOFFRE (Directeur commercial Cosmétiques et Parfums)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/vincent-joffre-62a52218", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LE BHV MARAIS", "segment": "indie_emerging", "pays": "France", "contact": "Gregoire Bidault (Buyer - Beauty & Scents)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/gregoire-bidault", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Self-employed", "segment": "indie_emerging", "pays": "France", "contact": "Thomas Jeunet (Executive Advisor & Project Founder Luxury • Art • Retail • Cultural projects)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/thomasjeunet", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Youlike Beauty Packaging", "segment": "indie_emerging", "pays": "France", "contact": "Betty Den (Sales Marketing Manager)", "email": "aromayoulike@hotmail.com", "tel": "", "linkedin": "https://www.linkedin.com/in/betty-d-b9aba4175", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "CosmeO", "segment": "indie_emerging", "pays": "France", "contact": "Nicolas Treguer (Dirigeant associé)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/nicolastreguer", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "PCC Partenariats Cosmétiques Cinéma & @BeautyClap", "segment": "indie_emerging", "pays": "France", "contact": "Pascale Breton (Beauty Clap) (Beauty Clap : Collabs Cosmétiques Cinéma)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/pascale-breton-beauty-clap-75785519", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Fuller Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "Yubizay J. Pérez Utrera (Director general)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/yubizay-perez-u", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LORCOS | Fabricant Cosmétique", "segment": "indie_emerging", "pays": "France", "contact": "Jean-Charles DELECROIX (France & Export Manager LORCOS)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/jean-charles-delecroix-7613a92", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "SurfactGreen", "segment": "clean_beauty", "pays": "France", "contact": "Fabien Bousso (Business Development Manager – Sustainable Ingredients)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/fabien-bousso-aa335324", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "PREMIUM BEAUTY MEDIA | Premium Beauty News - Brazil Beauty News", "segment": "indie_emerging", "pays": "France", "contact": "Vincent Gallon (CEO, Founder and Managing Editor)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/vincent-gallon-07b02b1", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "NBCUniversal", "segment": "indie_emerging", "pays": "France", "contact": "Manon Hautsch (Category Manager Food, Beauty and Care | France & Benelux)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/manon-hautsch-1757a814b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "L'ACTUALITE BEAUTE DE LA SEMAINE", "segment": "indie_emerging", "pays": "France", "contact": "Teddy LE MAOUT (Observateur privilégié de l'industrie beauté)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/teddy-le-maout-74720b20", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Bogart", "segment": "indie_emerging", "pays": "France", "contact": "Sonya Roblin (Europe Sales Director & Skincare International Biz.Dev)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/sonya-roblin-0a11b628", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "HORIZON LUXE", "segment": "indie_emerging", "pays": "France", "contact": "Jean-Sebastien DEGUETTE (CEO)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/jsdeguette", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Meraki Beauty", "segment": "indie_emerging", "pays": "France", "contact": "Carlos Alonso-Cortes Rodriguez (Independent Distributor)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/carlosalonso-cortes-rodriguez", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Beauty Expert Consulting", "segment": "indie_emerging", "pays": "France", "contact": "Francis Mben Bayo (Partner / VP Sales chez Beauty Expert Consulting)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/mbenbayofrancis", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "ESSENTIAL PARFUMS", "segment": "indie_emerging", "pays": "France", "contact": "Géraldine Archambault (Co Founder - CEO)", "email": "archambault.g@gmail.com", "tel": "", "linkedin": "https://www.linkedin.com/in/geraldinearchambault", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Go Beauty", "segment": "indie_emerging", "pays": "France", "contact": "Karine Tiano (International Sales Agent & Business Development Consultant)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/karinetiano", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "ESTEBAN Paris Parfums", "segment": "indie_emerging", "pays": "France", "contact": "Guillaume FOURNY ✅ (Export Director & Private Label Director)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/guillaume-fourny-%E2%9C%85-4522491", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Mi-rê Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "Elizabeth Armenta - Tremosa (CEO and Co-founder)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/elizabeth-armenta-tremosa", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Les Bénéfiques, les cosmétiques qui n'ont rien à cacher 👀!", "segment": "indie_emerging", "pays": "France", "contact": "Nathalie Bovis🌟🇫🇷🌿 Les Bénéfiques (Co-Founder)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/nathaliebovis", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "pH fragrances", "segment": "indie_emerging", "pays": "France", "contact": "Camille Le Feuvre (CEO & Founder pH fragrances)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/camille-le-feuvre", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "GILBERT", "segment": "indie_emerging", "pays": "France", "contact": "Charlotte Berthier Geoffroy (Directrice marketing Cosmétique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/charlotte-berthier-geoffroy-4678a637", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LVMH", "segment": "premium_luxury", "pays": "France", "contact": "Mathilde Laroche (Business Planning & Control Manager - LVMH Fashion Group)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/mathildeibanez", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "ouate-paris", "segment": "indie_emerging", "pays": "France", "contact": "laurence lachaud (Commerciale Dermo cosmétiques enfants et juniors)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/laurence-lachaud-0a3ab7a6", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Botanique & Cosmétique", "segment": "indie_emerging", "pays": "France", "contact": "Aude Barré (Développement produits)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/audebarre-cosmetique-conseil", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Free lance", "segment": "indie_emerging", "pays": "France", "contact": "Janine Morvan (Parcours dédié au soin à l'autre, à |'accompagnement quotidien et au bien-être global.)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/janine-morvan-28552899", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "La Cosméteuse - Formulations - Conseils - Formations - Cosmétique naturelle", "segment": "indie_emerging", "pays": "France", "contact": "Shannon M'pele (Alternante - Formulatrice cosmétique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/shannon-m-pele-1a9042251", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Freelance", "segment": "indie_emerging", "pays": "France", "contact": "Dorothée Esnault (Structuration Développement Produits Cosmétiques et Nutraceutiques (NPD))", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/doroth%C3%A9e-esnault-4499ab21", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Adopt Parfums", "segment": "indie_emerging", "pays": "France", "contact": "Marion Baby (Responsable marketing opérationnel et merchandising)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/marion-baby-b6164862", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Groupe Casino", "segment": "indie_emerging", "pays": "France", "contact": "Camille Mery (Responsable de categorie/ Achat beauté (DHP, parapharmacie et maquillage))", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/camille-mery-3a565ab5", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "PHARMACIE BERTHELOT DESTRELAND", "segment": "indie_emerging", "pays": "France", "contact": "Kéva ZENON (Conseillère Dermo Cosmétique Pharmaceutique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/k%C3%A9va-zenon-a96003236", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Anjac Health & Beauty GROUP", "segment": "indie_emerging", "pays": "France", "contact": "Diane Madre (Business Developer - AIRCOS & PASCUAL)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/diane-madre", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "MCBG | Marie Claire Beauty Group", "segment": "indie_emerging", "pays": "France", "contact": "Lydie GOLLENTZ (Chef de produit)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/lydiegollentz", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Endro cosmétiques", "segment": "indie_emerging", "pays": "France", "contact": "Boris Le Goffic (Chief Executive Officer)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/boris-le-goffic-278b67116", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Private label beauty", "segment": "indie_emerging", "pays": "France", "contact": "Romain Derrien 👄 (Associate Founder)", "email": "rderrien@trew.fr", "tel": "", "linkedin": "https://www.linkedin.com/in/romain-derrien", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Cosmetic Valley", "segment": "indie_emerging", "pays": "France", "contact": "Fanélie PAULMIER (Chargée de mission projet Recherche & Innovation)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/fan%C3%A9lie-paulmier-826687172", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "D'ORSAY Parfums", "segment": "indie_emerging", "pays": "France", "contact": "Anaïs Gruss (Marketing Manager | Head of Product Development)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/anaisgruss", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "REGUL BEAUTY", "segment": "indie_emerging", "pays": "France", "contact": "ELODIE BUSSO (Toxicologist)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/elodie-busso-9620b08a", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "GBC - Laboratoire cosmétique", "segment": "indie_emerging", "pays": "France", "contact": "Maëlle Guénec (Responsable recherche et développement)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/maelleguenec", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "ALTERCOSMETO", "segment": "indie_emerging", "pays": "France", "contact": "Guillaume WIDEHEM (Directeur Général Marques (Algologie, Dr Renaud))", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/guillaume-widehem-00590b60", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Inside Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "Camille Bassier (Consultante en réglementation cosmétique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/camille-bassier-590785172", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "AP COSMETIC CONSULT", "segment": "indie_emerging", "pays": "France", "contact": "Amandine Perez (Fondatrice)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/amandine-perez-5b0325a1", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "FormulaNova", "segment": "indie_emerging", "pays": "France", "contact": "Danuta Drag (Co-founder & CFO)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/danuta-drag-14299332", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LSI Parfum, Cosmétique, Arôme. LSI, la signature informatique du savoir faire Français !", "segment": "indie_emerging", "pays": "France", "contact": "Pierrick Rodot (Directeur commercial)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/pierrick-rodot-lsi", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Parfums Caron", "segment": "indie_emerging", "pays": "France", "contact": "Marie ZAMBONI (Responsable Ressources Humaines)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/marie-zamboni-b83472143", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Groupe Rocher", "segment": "indie_emerging", "pays": "France", "contact": "Anne-Laure Tréton (360 Campaign & Content Manager Makeup & Fragrances Yves Rocher)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/anne-laure-tr%C3%A9ton-6613658a", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Merk-Vision", "segment": "indie_emerging", "pays": "France", "contact": "Michaela Merk (Motivational Public Speaker in Customer Experience / Leadership / Premium & Luxury)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/michaelamerkconferencier", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "INGLOT Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "Paulina Rybak (Key Account Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/paulina-rybak-salesmanager", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Beauté Privée", "segment": "indie_emerging", "pays": "France", "contact": "Mylène Legroux (Directrice artistique)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/myl%C3%A8ne-legroux-111811121", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Essences & Parfums", "segment": "indie_emerging", "pays": "France", "contact": "Samuel Desprets (President / CEO Essences & Parfums)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/samueldesprets9582767", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "AZUR FRAGRANCES", "segment": "indie_emerging", "pays": "France", "contact": "Karine Cevoz-Goyat (Mission d'accompagnement marketing et commercial des clients prioritaires)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/karinecevozgoyat", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "LESSONIA", "segment": "indie_emerging", "pays": "France", "contact": "Léa Duteil (Skincare sales manager France & Export)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/l%C3%A9aduteil", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "GLÖ Studio", "segment": "indie_emerging", "pays": "France", "contact": "Agata Gourlaouen Carpentier (Co-Fondatrice - Marketing Design Retail spécialiste des marques de beauté / santé)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/agata-gourlaouen-carpentier-a0888959", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Bon Parfumeur", "segment": "indie_emerging", "pays": "France", "contact": "Mary ALLI-OWE (Assistante opérations commerciales)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/mary-alli-owe-905a18215", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Yves Rocher", "segment": "indie_emerging", "pays": "France", "contact": "Estelle BOUVET (Global Head of Formula Development Group Rocher)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/estelle-bouvet-a2613190", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Parfums Christian Dior", "segment": "premium_luxury", "pays": "France", "contact": "SARAH CHAMBERS (Head of Marketing - FRAGRANCE, MAKEUP & SKINCARE)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/sarah-chambers-5419a724", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "The Estée Lauder Companies Inc.", "segment": "indie_emerging", "pays": "France", "contact": "Caroline Morris (National Marketing and Communications Manager ANZ, M.A.C Cosmetics & Bobbi Brown)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/carolinechauvet", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Christian Dior Couture", "segment": "premium_luxury", "pays": "France", "contact": "Franck-Edouard Dubar (Transfer Pricing Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/franck-edouard-dubar-00327230", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Sabé Masson - Le Parfum de Soin", "segment": "indie_emerging", "pays": "France", "contact": "Boris Gratini (Président)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/boris-gratini-93026321", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Korn Ferry", "segment": "indie_emerging", "pays": "France", "contact": "Patricia Chini Forush (Senior Associate - Global Luxury)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/patricia-chini-forush-95a08895", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "StratNXT - part of Cosmo5", "segment": "indie_emerging", "pays": "France", "contact": "Karl Hoquante (Deputy General Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/karlhoquante", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "L'Observatoire Beauté", "segment": "indie_emerging", "pays": "France", "contact": "Adélaïde Lohio (Fondatrice)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/ad%C3%A9la%C3%AFde-lohio", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Hourglass Cosmetics", "segment": "indie_emerging", "pays": "France", "contact": "Monira B (Sales & Marketing Manager EU)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/monira-b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "M.A. WELLNESS AND BEAUTY", "segment": "indie_emerging", "pays": "France", "contact": "Emmanuelle DUMAS (INTERIM MARKETING MANAGER)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/emmanuelle-dumas", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Entrepreneurship JL", "segment": "indie_emerging", "pays": "France", "contact": "Judith Lévy (Project Manager Cosmetic, Food, Table art...)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/judith-l%C3%A9vy", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "NATUR'INSIGHT", "segment": "indie_emerging", "pays": "France", "contact": "Frédérique Portolan, PhD (CEO & Founder | Consultant | Providing strategic input in active ingredients design for PC business)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/frederique-portolan", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Global Beauty Consulting - Laboratoire cosmétique", "segment": "indie_emerging", "pays": "France", "contact": "Gael BOUTRY (Dirigeant - Laboratoire cosmétique (formulation, réglementaire...))", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/gael-boutry-55269727", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Strive - part of Cosmo5", "segment": "indie_emerging", "pays": "France", "contact": "Philippe Garnier (Co-Founder & CEO)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/mrphilippegarnier", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "VISEO", "segment": "indie_emerging", "pays": "France", "contact": "Etienne GARANGER (Business Director Retail CPG and Luxury)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/etienne-garanger-aa5509a3", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Sephora Europe", "segment": "indie_emerging", "pays": "France", "contact": "Camille Pouzet (Retail Marketing Director)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/camille-pouzet-45341b46", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Accenture Song", "segment": "indie_emerging", "pays": "France", "contact": "Sophie Diverchy (Senior Manager Retail & Luxury)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/sophie-diverchy-723abbbb", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Comptoir National de l'Or et Rivluxe", "segment": "indie_emerging", "pays": "France", "contact": "Marine Chevalier (Directrice Marketing et Communication)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/marinechevalier", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Maison Alaïa", "segment": "indie_emerging", "pays": "France", "contact": "Appoline d'Ambrières (Directrice Accessoires (maroquinerie, chaussure, bijoux, lunettes, parfum))", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/appoline-d-ambri%C3%A8res-0a558041", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Aptenia", "segment": "indie_emerging", "pays": "France", "contact": "Y. Mannina (Co-Founder | France, Switzerland, Belgium & Luxembourg | Aptenia)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/y-mannina-232a26130", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Lesaffre", "segment": "indie_emerging", "pays": "France", "contact": "Audrey MANIÈRE (Global Cosmetic Formulation Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/audrey-mani%C3%A8re-945865a6", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "L'Oréal", "segment": "indie_emerging", "pays": "France", "contact": "LOUBNA BENZAKOUR (General Manager l’Oréal Luxe Morocco)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/loubna-benzakour-72291224", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Puig", "segment": "indie_emerging", "pays": "France", "contact": "Cassandre Sion (General Manager Rabanne Beauty)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/cassandre-sion-89247041", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Merkle DACH", "segment": "indie_emerging", "pays": "France", "contact": "Anna LARVOR (Account Director Luxury Vertical)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/anna-larvor", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Berluti", "segment": "indie_emerging", "pays": "France", "contact": "Marie-Caroline Selmer (Concepteur-rédacteur & Copywriter luxe)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/marie-caroline-selmer-9a43543b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Luxury Living", "segment": "indie_emerging", "pays": "France", "contact": "Yasmin Rudnicka (Sales Manager)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/yasmin-rudnicka-4694959b", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Indépendant", "segment": "indie_emerging", "pays": "France", "contact": "Valérie Boulet (New Product Development & Operations Fractional Leader | Fragrance, Beauty, Wellness)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/val%C3%A9rie-boulet", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "BIRKENSTOCK", "segment": "indie_emerging", "pays": "France", "contact": "Quentin Ojeda (Director BIRKENSTOCK Cosmetics)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/quentin-ojeda", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Pinterest", "segment": "indie_emerging", "pays": "France", "contact": "Pauline Velay (Luxury Beauty Client Lead)", "email": "", "tel": "", "linkedin": "https://www.linkedin.com/in/paulinevelay", "score": 40, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "sisleyparis", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 30, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "payot_paris", "segment": "indie_emerging", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 30, "tier": "2", "statut": "a-contacter", "notes": "", "site": ""}, {"nom": "Laboratoire FATILAB", "segment": "indie_emerging", "pays": "Algeria", "contact": "Mehdi SAHA (Ingénieur commercial)", "email": "saha.mehdi@fatilab.com", "tel": "+213 770631687", "linkedin": "", "score": 26, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://laboratoirefatilab.com"}, {"nom": "Laboratoire SVR", "segment": "indie_emerging", "pays": "France", "contact": "Laurence BOURQUIN (Responsable achats packaging)", "email": "laurence.bourquin@svr.com", "tel": "+33 647402953", "linkedin": "", "score": 26, "tier": "3", "statut": "contacte", "notes": "", "site": "https://laboratoiresvr.com"}, {"nom": "AMOUYÉ INVESTMENTS", "segment": "premium_luxury", "pays": "France", "contact": "Patrick Amouyé (Pdg)", "email": "patrickamouye74@gmail.com", "tel": "+33 666956779", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://amouyeinvestments.com"}, {"nom": "AMV Conseil", "segment": "premium_luxury", "pays": "France", "contact": "ANNIE VILLAZ (Chef de projets Marketing)", "email": "an.villaz@wanadoo.fr", "tel": "+33 0609695135", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://amvconseil.com"}, {"nom": "Amanie LLC", "segment": "premium_luxury", "pays": "United States", "contact": "Alexandra Leiner (Director of packaging)", "email": "a.leiner@theamanie.com", "tel": "+357 97883981", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://amaniellc.com"}, {"nom": "BEAUTY SERVICES EUROPE", "segment": "premium_luxury", "pays": "France", "contact": "Marion COLLET (Responsable des achats)", "email": "marion.collet@group-ibg.com", "tel": "+33 07 60 41 26 92", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://beautyserviceseurope.com"}, {"nom": "BELÂGE CARE", "segment": "premium_luxury", "pays": "France", "contact": "Nabila Belhaj (CEO)", "email": "nabila@vernixa.com", "tel": "+33 624355524", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://belagecare.com"}, {"nom": "Black Swan Fragrance", "segment": "premium_luxury", "pays": "Netherlands", "contact": "Rob Kampschöer (Founder / Co-founder)", "email": "luxury@blackswan-fragrance.com", "tel": "+31 0642155991", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://blackswanfragrance.com"}, {"nom": "C. E. Gätcke's Glas Gesellschaft mbH", "segment": "premium_luxury", "pays": "Germany", "contact": "Dorothée Kuhnert (Managing Director)", "email": "dorothee.kuhnert@treffpack.de", "tel": "+491718617770", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://cegatcke'sglasgesellschaftmbh.com"}, {"nom": "Cristal Décisions", "segment": "premium_luxury", "pays": "France", "contact": "Ophélie FILIO (Business Manager)", "email": "ophelie.filio@cristal-decisions.com", "tel": "+33 0664280749", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://cristaldecisions.com"}, {"nom": "Dr Kalo Valene", "segment": "premium_luxury", "pays": "France", "contact": "Valene Kalo (Médecin)", "email": "valenekalo@yahoo.fr", "tel": "+33 698381516", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://drkalovalene.com"}, {"nom": "Dr Yanga", "segment": "premium_luxury", "pays": "France", "contact": "Cinthy Yanga (CEO)", "email": "cinthy.yanga@gmail.com", "tel": "+33 698381516", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://dryanga.com"}, {"nom": "Dr. Sayel", "segment": "premium_luxury", "pays": "Germany", "contact": "Gastelle Tiétcha (Fondatrice)", "email": "gasteltietcha@hotmail.com", "tel": "+49 17670166714", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://drsayel.com"}, {"nom": "ESRA", "segment": "premium_luxury", "pays": "United Kingdom", "contact": "Alexandra Pope (Head of Projects)", "email": "alexandra@esra-fo.com", "tel": "+44 7443290650", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://esra.com"}, {"nom": "EURL COSMEYAD PARFUMS ET COSMETIQUE", "segment": "premium_luxury", "pays": "Algeria", "contact": "KHELIL KHELIL (GERANT)", "email": "eurl_cosmeyad@yahoo.fr", "tel": "+213 550509181", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://eurlcosmeyadparfumsetcosmetique.com"}, {"nom": "Elsa CTR", "segment": "premium_luxury", "pays": "France", "contact": "Elsa Couturier (CEO)", "email": "elsacouturier.pro@gmail.com", "tel": "+33 613449488", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://elsactr.com"}, {"nom": "H&T Cosmetics", "segment": "premium_luxury", "pays": "France", "contact": "Johanne Hinson (CEO)", "email": "johanne-hinson@hotmail.fr", "tel": "+33 699414128", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://handtcosmetics.com"}, {"nom": "INSPIRATIONS COSMETIQUES", "segment": "premium_luxury", "pays": "France", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://inspirationscosmetiques.com"}, {"nom": "Inayo", "segment": "premium_luxury", "pays": "France", "contact": "Christina Sampaio (Gérante)", "email": "cristina_6921@hotmail.fr", "tel": "+33 661459677", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://inayo.com"}, {"nom": "J’emme", "segment": "premium_luxury", "pays": "Belgium", "contact": "Julie Tinant (gérante)", "email": "julie@jemme.be", "tel": "+32 476284047", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://j’emme.com"}, {"nom": "LGP2 - Cellulose Valley", "segment": "premium_luxury", "pays": "France", "contact": "CANDICE REY (Co-directrice)", "email": "candice.rey@grenoble-inp.fr", "tel": "+33 675303803", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://lgp2-cellulosevalley.com"}, {"nom": "Larme astrale", "segment": "premium_luxury", "pays": "France", "contact": "Lola Brien (Directeur de création)", "email": "larmeastrale@gmail.com", "tel": "+33 0610196317", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://larmeastrale.com"}, {"nom": "L’Oréal", "segment": "premium_luxury", "pays": "France", "contact": "Ankita Lokhande (Head of department Packaging Qualification)", "email": "ankita.lokhande@loreal.com", "tel": "+33 1 49 18 00 00", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://l’oreal.com"}, {"nom": "M.F.I Parfums", "segment": "premium_luxury", "pays": "France", "contact": "Mohammed Fares (Directeur general)", "email": "m.fares@mfiparfums.com", "tel": "+33 664699861", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://mfiparfums.com"}, {"nom": "MPS International Sp. z o.o.", "segment": "premium_luxury", "pays": "Poland", "contact": "Tomasz Tolwinski (Vice President of The Board)", "email": "tomasz.tolwinski@mps.koszalin.pl", "tel": "+48 505 164 342", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://mpsinternationalspzoo.com"}, {"nom": "Mahaja boutique", "segment": "premium_luxury", "pays": "France", "contact": "Hanane Boughalem (Autoentrepreneur)", "email": "hanboughalem@gmail.com", "tel": "+33 660440204", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://mahajaboutique.com"}, {"nom": "Maison Diami", "segment": "premium_luxury", "pays": "France", "contact": "Ivania Morais (Assistante)", "email": "prismorais98@gmail.com", "tel": "+33 0641569236", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://maisondiami.com"}, {"nom": "Mauzan", "segment": "premium_luxury", "pays": "United Arab Emirates", "contact": "Rishad Rizvi (General manager)", "email": "mohamed.rishad@mauzan.com", "tel": "+971 555234588", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://mauzan.com"}, {"nom": "NTL SRL", "segment": "premium_luxury", "pays": "Italy", "contact": "Fabio Lorenzi (CEO)", "email": "lorenzi.fabio@it-ntl.com", "tel": "+39 3317725594", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://ntlsrl.com"}, {"nom": "Necessaire", "segment": "premium_luxury", "pays": "United States", "contact": "Justin Williams (Global Head of Packaging)", "email": "justin@necessaire.com", "tel": "+1 4698348638", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://necessaire.com"}, {"nom": "ODOR CONTROL", "segment": "premium_luxury", "pays": "Romania", "contact": "GABRIELA COMAN (Directeur general)", "email": "gabriela@comann.ro", "tel": "+40 744369422", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://odorcontrol.com"}, {"nom": "PERMAMED AG", "segment": "premium_luxury", "pays": "Switzerland", "contact": "Noële Auclair-Riva (Head of R&D)", "email": "n.auclair-riva@permamed.ch", "tel": "+41 617252020", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://permamedag.com"}, {"nom": "RDT Roissy", "segment": "premium_luxury", "pays": "France", "contact": "Bastien DUBOIS (Commercial)", "email": "bdubois@rdtlogistic.com", "tel": "+33 06 17 87 00 36", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://rdtroissy.com"}, {"nom": "ROYAUME DU PARFUM INTERNATIONAL", "segment": "premium_luxury", "pays": "France", "contact": "Christelle Floquet (Chargée de projets)", "email": "c.himeur.rpi@gmail.com", "tel": "+33 616674129", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://royaumeduparfuminternational.com"}, {"nom": "SAS LA DOUCE BARBE & LA BOUCLETTE", "segment": "premium_luxury", "pays": "France", "contact": "Cynthia CHAMBEAU (CEO)", "email": "doucebarbe.bouclette@gmail.com", "tel": "+33 0667432740", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://sasladoucebarbeandlabouclette.com"}, {"nom": "SOPHIA SIMITI & CO", "segment": "premium_luxury", "pays": "Greece", "contact": "Rafail Alexandros Simitis Molfesis (Sales executive)", "email": "rsimitis@sophiasimiti.gr", "tel": "+30 6942983769", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://sophiasimitiandco.com"}, {"nom": "Selarl Janvion", "segment": "premium_luxury", "pays": "France", "contact": "Sabrina Janvion (Fondatrice)", "email": "jslinktrade@gmail.com", "tel": "+33 646325223", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://selarljanvion.com"}, {"nom": "Selinko SA", "segment": "premium_luxury", "pays": "France", "contact": "Ping Sheng Hsu (Growth Marketing Specialist)", "email": "saem@selinko.com", "tel": "+33 7 59 50 94 69", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://selinkosa.com"}, {"nom": "VALOIS", "segment": "premium_luxury", "pays": "France", "contact": "Thomas Dewez (Commercial)", "email": "t.dewez@emballages-valois.fr", "tel": "+33 681254629", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://valois.com"}, {"nom": "Verdandi Perfume", "segment": "premium_luxury", "pays": "Switzerland", "contact": "", "email": "", "tel": "", "linkedin": "", "score": 25, "tier": "3", "statut": "a-contacter", "notes": "", "site": "https://verdandiperfume.com"}, {"nom": "WSBL", "segment": "premium_luxury", "pays": "United Arab Emirates", "contact": "Linda Ausheva (Product/ Brand manager)", "email": "linda@wsbrandlab.com", "tel": "+7 9851178365", "linkedin": "", "score": 25, "tier": "3", "statut": "en-conversation", "notes": "", "site": "https://wsbl.com"}, {"nom": "odore scola", "segment": "premium_luxury", "pays": "France", "contact": "Elisa Alazard (Directrice des opérations)", "email": "elisa.a@odorescola.com", "tel": "+33 0764262225", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://odorescola.com"}, {"nom": "womanland", "segment": "premium_luxury", "pays": "Romania", "contact": "IRINA MAZILU (CEO)", "email": "womanland@yahoo.com", "tel": "+40 764436043", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://womanland.com"}, {"nom": "Blanc Creme", "segment": "premium_luxury", "pays": "France", "contact": "Christophe Delorme (Directeur Marketing & Ventes)", "email": "cdelorme@blancreme.com", "tel": "+33 659864033", "linkedin": "", "score": 25, "tier": "3", "statut": "contacte", "notes": "", "site": "https://epiceriefinecosmetique.com"}, {"nom": "Estee Lauder Companies", "segment": "premium_luxury", "pays": "France", "contact": "Nisha Mathew (Purchasing/ procurement director)", "email": "nimathew@estee.com", "tel": "+1 2299405", "linkedin": "", "score": 23, "tier": "3", "statut": "contacte", "notes": "", "site": "https://esteelaudercompanies.com"}];
+
+const SEGMENTS = {
+  'luxury_premium':  { label: 'Luxe',    color: '#e94560' },
+  'premium_luxury':  { label: 'Luxe',    color: '#e94560' },
+  'clean_beauty':    { label: 'Clean',   color: '#06D6A0' },
+  'indie_emergent':  { label: 'Indie',   color: '#F59E0B' },
+  'indie_emerging':  { label: 'Indie',   color: '#F59E0B' },
+  'fragrance':       { label: 'Parfum',  color: '#8B5CF6' },
+  'skincare':        { label: 'Soin',    color: '#00B4D8' }
+};
+
+const STATUTS = {
+  'a-contacter':     { label: 'À contacter',    color: '#7BA7BC' },
+  'contacte':        { label: 'Contacté',        color: '#F59E0B' },
+  'engage':          { label: 'Engagé',          color: '#8B5CF6' },
+  'en-conversation': { label: 'En conversation', color: '#06D6A0' },
+  'qualifie':        { label: 'Qualifié',        color: '#e94560' }
+};
+
+const COLS = [
+  { key: 'a-contacter',     label: 'À contacter',    cls: 'col-a-contacter' },
+  { key: 'contacte',        label: 'Contacté',        cls: 'col-contacte' },
+  { key: 'engage',          label: 'Engagé',          cls: 'col-engage' },
+  { key: 'en-conversation', label: 'En conversation', cls: 'col-en-conversation' },
+  { key: 'qualifie',        label: 'Qualifié',        cls: 'col-qualifie' }
+];
+
+function getSegmentBadge(seg) {
+  const s = SEGMENTS[seg] || { label: seg || '?', color: '#7BA7BC' };
+  return `<span class="segment-badge seg-${seg}" style="background:${s.color}20;color:${s.color}">${s.label}</span>`;
+}
+
+let sb = null;
+let prospects = [];
+let editingId = null;
+let activeFilter = 'all';
+let realtimeChannel = null;
+
+// -- SUPABASE CONNECT --
+async function connectSupabase() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+
+  if (!url || !key) {
+    errEl.textContent = 'Merci de renseigner les deux champs.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+
+  try {
+    sb = supabase.createClient(url, key);
+
+    // Test connexion
+    const { error } = await sb.from('wpe_prospects').select('id').limit(1);
+    if (error) throw error;
+
+    // Sauvegarder config
+    localStorage.setItem('wpe_sb_url', url);
+    localStorage.setItem('wpe_sb_key', key);
+
+    await loadAndStart();
+  } catch (e) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+    const msg = e.message || e.toString();
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+      errEl.innerHTML = '<strong>Erreur réseau</strong> — Impossible de joindre Supabase.<br>Vérifiez votre connexion internet. Si vous avez ouvert ce fichier en local (file://), essayez via <code>python -m http.server 8080</code>.';
+    } else {
+      errEl.textContent = 'Erreur : ' + msg + ' — Vérifie que la table "wpe_prospects" existe dans Supabase.';
+    }
+    errEl.style.display = 'block';
+  }
+}
+
+async function loadAndStart() {
+  // Charger données
+  const { data, error } = await sb.from('wpe_prospects').select('*').order('created_at');
+  if (error) throw error;
+
+  // Si vide, insérer données par défaut
+  if (data.length === 0) {
+    const { error: insErr } = await sb.from('wpe_prospects').insert(DEFAULT_PROSPECTS);
+    if (insErr) throw insErr;
+    const { data: d2 } = await sb.from('wpe_prospects').select('*').order('created_at');
+    prospects = d2 || [];
+  } else {
+    prospects = data;
+  }
+
+  // Démarrer realtime
+  startRealtime();
+
+  // Afficher app
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('fab').style.display = 'block';
+
+  renderAll();
+}
+
+function startRealtime() {
+  if (realtimeChannel) realtimeChannel.unsubscribe();
+  realtimeChannel = sb
+    .channel('prospects-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'wpe_prospects' }, payload => {
+      if (payload.eventType === 'INSERT') {
+        prospects.push(payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = prospects.findIndex(p => p.id === payload.new.id);
+        if (idx !== -1) prospects[idx] = payload.new;
+      } else if (payload.eventType === 'DELETE') {
+        prospects = prospects.filter(p => p.id !== payload.old.id);
+      }
+      renderAll();
+      showToast('Mis à jour en temps réel');
+    })
+    .subscribe();
+}
+
+function resetConfig() {
+  localStorage.removeItem('wpe_sb_url');
+  localStorage.removeItem('wpe_sb_key');
+  if (realtimeChannel) realtimeChannel.unsubscribe();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('fab').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+// -- FILTER & SEARCH --
+function setFilter(tier, btn) {
+  activeFilter = tier;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function getFiltered() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const userFilter = document.getElementById('user-filter').value;
+  return prospects.filter(p => {
+    const matchTier = activeFilter === 'all' || p.tier === activeFilter;
+    const matchQ = !q || (p.nom || '').toLowerCase().includes(q) || (p.contact || '').toLowerCase().includes(q) || (p.pays || '').toLowerCase().includes(q);
+    const matchUser = !userFilter || (p.suivi_par || '') === userFilter;
+    return matchTier && matchQ && matchUser;
+  });
+}
+
+// -- STATS --
+function updateStats() {
+  const total = prospects.length;
+  document.getElementById('stat-total').textContent = total;
+  const contactes = prospects.filter(p => p.statut !== 'a-contacter').length;
+  document.getElementById('stat-contactes').textContent = contactes;
+  const qualifies = prospects.filter(p => p.statut === 'qualifie').length;
+  document.getElementById('stat-qualifies').textContent = qualifies;
+  const conv = total > 0 ? Math.round((qualifies / total) * 100) : 0;
+  document.getElementById('stat-conv').textContent = conv + '%';
+}
+
+// -- KANBAN --
+function renderKanban() {
+  const board = document.getElementById('kanban-board');
+  const filtered = getFiltered();
+  board.innerHTML = '';
+  COLS.forEach(col => {
+    const cards = filtered.filter(p => p.statut === col.key);
+    const div = document.createElement('div');
+    div.className = 'column';
+    div.innerHTML = `<div class="col-header ${col.cls}"><span>${col.label}</span><span class="col-count">${cards.length}</span></div>`;
+    if (!cards.length) {
+      div.innerHTML += '<div class="empty-col">Aucun prospect</div>';
+    } else {
+      cards.forEach(p => {
+        const card = document.createElement('div');
+        card.className = `card tier${p.tier}`;
+        card.onclick = () => openModal(p.id);
+        card.innerHTML = `
+          <span class="tier-badge t${p.tier}">T${p.tier}</span>
+          <div class="card-name">${escHtml(p.nom)}</div>
+          ${getSegmentBadge(p.segment)}
+          ${p.suivi_par ? `<span class="suivi-badge suivi-${p.suivi_par.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}">${escHtml(p.suivi_par)}</span>` : ''}
+          <div class="card-contact">${escHtml(p.contact || '')}</div>
+          <div class="card-score">Score : ${p.score || 0}/110</div>
+          ${p.notes ? `<div class="card-note">${escHtml(p.notes)}</div>` : ''}
+          ${p.next_contact ? `<div style="font-size:10px;color:#F59E0B;margin-top:5px;">Next: ${p.next_contact}</div>` : ''}
+        `;
+        div.appendChild(card);
+      });
+    }
+    board.appendChild(div);
+  });
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// -- LIST --
+function renderList() {
+  const rows = document.getElementById('list-rows');
+  rows.innerHTML = '';
+  getFiltered().forEach(p => {
+    const s = STATUTS[p.statut] || STATUTS['a-contacter'];
+    const div = document.createElement('div');
+    div.className = 'prospect-row';
+    div.onclick = () => openModal(p.id);
+    div.innerHTML = `
+      <div><strong>${escHtml(p.nom)}</strong></div>
+      <div>${getSegmentBadge(p.segment)}</div>
+      <div>${escHtml(p.pays || '—')}</div>
+      <div style="font-size:11px">${escHtml(p.contact || '—')}</div>
+      <div><span class="tier-badge t${p.tier}" style="float:none">T${p.tier}</span></div>
+      <div><span class="status-dot dot-${p.statut}"></span>${s.label}</div>
+      <div style="color:#e94560;font-weight:600">${p.score || 0}</div>
+      <div>${p.suivi_par ? `<span class="suivi-badge suivi-${p.suivi_par.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}">${escHtml(p.suivi_par)}</span>` : '<span style="color:#ccc;font-size:11px">—</span>'}</div>
+      <div><button class="btn btn-email" onclick="event.stopPropagation();openModal(${p.id})">Éditer</button></div>
+    `;
+    rows.appendChild(div);
+  });
+}
+
+function renderAll() { renderKanban(); renderList(); updateStats(); }
+
+// -- MODAL --
+function openModal(id) {
+  editingId = id || null;
+  const btnDel = document.getElementById('btn-delete');
+  if (id) {
+    const p = prospects.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('modal-title').textContent = 'Modifier : ' + p.nom;
+    document.getElementById('f-nom').value = p.nom || '';
+    document.getElementById('f-segment').value = p.segment || 'luxury_premium';
+    document.getElementById('f-pays').value = p.pays || 'France';
+    document.getElementById('f-contact').value = p.contact || '';
+    document.getElementById('f-email').value = p.email || '';
+    document.getElementById('f-tel').value = p.tel || '';
+    document.getElementById('f-linkedin').value = p.linkedin || '';
+    document.getElementById('f-score').value = p.score || 0;
+    document.getElementById('f-tier').value = p.tier || '2';
+    document.getElementById('f-statut').value = p.statut || 'a-contacter';
+    document.getElementById('f-site').value = p.site || '';
+    document.getElementById('f-suivi').value = p.suivi_par || '';
+    document.getElementById('f-next').value = p.next_contact || '';
+    document.getElementById('f-notes').value = p.notes || '';
+    btnDel.style.display = 'block';
+  } else {
+    document.getElementById('modal-title').textContent = 'Nouveau prospect';
+    ['f-nom','f-contact','f-email','f-tel','f-linkedin','f-site','f-notes','f-next'].forEach(fid => document.getElementById(fid).value = '');
+    document.getElementById('f-suivi').value = '';
+    document.getElementById('f-segment').value = 'luxury_premium';
+    document.getElementById('f-pays').value = 'France';
+    document.getElementById('f-score').value = 0;
+    document.getElementById('f-tier').value = '2';
+    document.getElementById('f-statut').value = 'a-contacter';
+    btnDel.style.display = 'none';
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+}
+
+async function saveProspect() {
+  const data = {
+    nom: document.getElementById('f-nom').value,
+    segment: document.getElementById('f-segment').value,
+    pays: document.getElementById('f-pays').value,
+    contact: document.getElementById('f-contact').value,
+    email: document.getElementById('f-email').value,
+    tel: document.getElementById('f-tel').value,
+    linkedin: document.getElementById('f-linkedin').value,
+    score: parseInt(document.getElementById('f-score').value) || 0,
+    tier: document.getElementById('f-tier').value,
+    statut: document.getElementById('f-statut').value,
+    site: document.getElementById('f-site').value,
+    next_contact: document.getElementById('f-next').value || null,
+    notes: document.getElementById('f-notes').value,
+    suivi_par: document.getElementById('f-suivi').value || null
+  };
+  if (!data.nom) return;
+
+  if (editingId) {
+    await sb.from('wpe_prospects').update(data).eq('id', editingId);
+  } else {
+    await sb.from('wpe_prospects').insert([data]);
+  }
+  closeModal();
+  showToast('Enregistré');
+}
+
+async function deleteProspect() {
+  if (!editingId) return;
+  if (confirm('Supprimer ce prospect ?')) {
+    await sb.from('wpe_prospects').delete().eq('id', editingId);
+    closeModal();
+    showToast('Supprimé');
+  }
+}
+
+// -- TABS --
+function switchTab(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// -- TEMPLATES --
+function copyTemplate(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
+    btn.textContent = 'Copié !';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copySql() {
+  navigator.clipboard.writeText(SQL_CREATE).then(() => showToast('SQL copié !'));
+}
+
+// -- TOAST --
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// -- MODAL CLOSE ON OVERLAY --
+document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+
+// -- FILE PROTOCOL WARNING --
+if (window.location.protocol === 'file:') {
+  document.getElementById('file-warning').style.display = 'block';
+}
+
+// -- AUTO-CONNECT --
+const DEFAULT_URL = 'https://roborjswoxzcuwvpahml.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvYm9yanN3b3h6Y3V3dnBhaG1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1Mjc3NDEsImV4cCI6MjA4NzEwMzc0MX0.aUGNPM190LLzOuAYg_UstATPb9W7kI0WL5H2WAytUIs';
+const savedUrl = localStorage.getItem('wpe_sb_url') || DEFAULT_URL;
+const savedKey = localStorage.getItem('wpe_sb_key') || DEFAULT_KEY;
+
+// Check supabase JS loaded
+if (typeof supabase === 'undefined') {
+  console.error('Supabase JS not loaded');
+  document.getElementById('cdn-error').style.display = 'flex';
+} else if (savedUrl && savedKey) {
+  document.getElementById('sb-url').value = savedUrl;
+  document.getElementById('sb-key').value = savedKey;
+  connectSupabase();
+}
+</script>
+</body>
+</html>
