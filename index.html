@@ -153,7 +153,14 @@
   .add-btn:hover { transform: scale(1.05); box-shadow: 0 6px 28px rgba(233,69,96,0.5); }
   .toast { position: fixed; bottom: 90px; right: 30px; background: #06D6A0; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 700; z-index: 200; opacity: 0; transition: opacity .3s; pointer-events: none; }
   .toast.show { opacity: 1; }
-  .contact-row { display: grid; grid-template-columns: 1.5fr 1.2fr 1.5fr 1.2fr 0.8fr 0.8fr; padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f0f0f0; align-items: center; transition: background .15s; cursor: pointer; }
+  .contact-row { display: grid; grid-template-columns: 1.5fr 1.2fr 1.5fr 1.2fr 0.8fr 0.8fr 0.7fr; padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f0f0f0; align-items: center; transition: background .15s; cursor: pointer; }
+  .status-btn { padding: 4px 10px; border-radius: 5px; border: 1px solid #ddd; background: #fff; font-size: 10px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .status-btn:hover { transform: scale(1.05); }
+  .status-btn.st-a-contacter { color: #7BA7BC; border-color: #7BA7BC; }
+  .status-btn.st-contacte { color: #F59E0B; border-color: #F59E0B; background: rgba(245,158,11,0.08); }
+  .status-btn.st-engage { color: #8B5CF6; border-color: #8B5CF6; background: rgba(139,92,246,0.08); }
+  .status-btn.st-en-conversation { color: #06D6A0; border-color: #06D6A0; background: rgba(6,214,160,0.08); }
+  .status-btn.st-qualifie { color: #e94560; border-color: #e94560; background: rgba(233,69,96,0.08); }
   .contact-row:hover { background: #fef7f8; }
   .contact-name { font-weight: 700; color: #2c2c2c; }
   .contact-role { font-size: 10px; color: #888; margin-top: 2px; }
@@ -306,8 +313,8 @@ create policy "public_all" on prospects for all using (true) with check (true);
     <input type="text" id="contact-search" placeholder="Rechercher un contact..." oninput="renderContacts()">
   </div>
   <div class="prospect-list">
-    <div class="prospect-list-header" style="grid-template-columns: 1.5fr 1.2fr 1.5fr 1.2fr 0.8fr 0.8fr;">
-      <div>Contact</div><div>Entreprise</div><div>Email</div><div>Téléphone</div><div>LinkedIn</div><div>Statut</div>
+    <div class="prospect-list-header" style="grid-template-columns: 1.5fr 1.2fr 1.5fr 1.2fr 0.8fr 0.8fr 0.7fr;">
+      <div>Contact</div><div>Entreprise</div><div>Email</div><div>Téléphone</div><div>LinkedIn</div><div>Statut</div><div>Action</div>
     </div>
     <div id="contact-rows"></div>
   </div>
@@ -705,6 +712,30 @@ function renderList() {
   });
 }
 
+const STATUS_FLOW = ['a-contacter', 'contacte', 'engage', 'en-conversation', 'qualifie'];
+
+async function quickStatusChange(id, e) {
+  e.stopPropagation();
+  const p = prospects.find(x => x.id === id);
+  if (!p) return;
+  const idx = STATUS_FLOW.indexOf(p.statut);
+  const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
+  if (next === p.statut) return;
+  const { error } = await sb.from('wpe_prospects').update({ statut: next }).eq('id', id);
+  if (!error) {
+    p.statut = next;
+    renderAll();
+    showToast(STATUTS[next].label);
+  }
+}
+
+function getNextLabel(statut) {
+  const idx = STATUS_FLOW.indexOf(statut);
+  const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
+  if (next === statut) return null;
+  return STATUTS[next].label;
+}
+
 function renderContacts() {
   const rows = document.getElementById('contact-rows');
   if (!rows) return;
@@ -725,6 +756,7 @@ function renderContacts() {
     const name = parts[0] || p.contact;
     const role = parts[1] || '';
     const s = STATUTS[p.statut] || STATUTS['a-contacter'];
+    const nextLabel = getNextLabel(p.statut);
     const div = document.createElement('div');
     div.className = 'contact-row';
     div.onclick = () => openModal(p.id);
@@ -735,6 +767,7 @@ function renderContacts() {
       <div>${p.tel ? `<a class="contact-link" href="tel:${escHtml(p.tel)}" onclick="event.stopPropagation()">${escHtml(p.tel)}</a>` : '<span style="color:#ccc">—</span>'}</div>
       <div>${p.linkedin ? `<a class="contact-link" href="${escHtml(p.linkedin)}" target="_blank" onclick="event.stopPropagation()">Profil</a>` : '<span style="color:#ccc">—</span>'}</div>
       <div><span class="status-dot dot-${p.statut}"></span>${s.label}</div>
+      <div>${nextLabel ? `<button class="status-btn st-${STATUS_FLOW[STATUS_FLOW.indexOf(p.statut)+1]}" onclick="quickStatusChange(${p.id}, event)">${nextLabel} &#8594;</button>` : '<span style="color:#06D6A0;font-size:10px;font-weight:700">&#10003;</span>'}</div>
     `;
     rows.appendChild(div);
   });
