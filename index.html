@@ -71,6 +71,7 @@
   .col-engage { border-color: #8B5CF6; color: #8B5CF6; }
   .col-en-conversation { border-color: #06D6A0; color: #06D6A0; }
   .col-qualifie { border-color: #e94560; color: #e94560; }
+  .col-pas-interessant { border-color: #9CA3AF; color: #9CA3AF; }
   .col-count { background: rgba(0,0,0,0.08); border-radius: 10px; padding: 1px 7px; font-size: 10px; }
 
   .card { background: #ffffff; border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 3px solid transparent; transition: all .2s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -133,6 +134,7 @@
   .dot-engage { background: #8B5CF6; }
   .dot-en-conversation { background: #06D6A0; }
   .dot-qualifie { background: #e94560; }
+  .dot-pas-interessant { background: #9CA3AF; }
 
   /* TEMPLATES */
   .template-card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; border-left: 3px solid #e94560; border: 1px solid #e0e0e0; border-left: 3px solid #e94560; }
@@ -161,6 +163,7 @@
   .status-btn.st-engage { color: #8B5CF6; border-color: #8B5CF6; background: rgba(139,92,246,0.08); }
   .status-btn.st-en-conversation { color: #06D6A0; border-color: #06D6A0; background: rgba(6,214,160,0.08); }
   .status-btn.st-qualifie { color: #e94560; border-color: #e94560; background: rgba(233,69,96,0.08); }
+  .status-btn.st-pas-interessant { color: #9CA3AF; border-color: #9CA3AF; background: rgba(156,163,175,0.08); }
   .contact-row:hover { background: #fef7f8; }
   .contact-name { font-weight: 700; color: #2c2c2c; }
   .contact-role { font-size: 10px; color: #888; margin-top: 2px; }
@@ -437,6 +440,7 @@ Clémence Huignard — WPE Solutions</div>
           <option value="engage">Engagé</option>
           <option value="en-conversation">En conversation</option>
           <option value="qualifie">Qualifié</option>
+          <option value="pas-interessant">Pas intéressant</option>
         </select>
       </div>
       <div class="field"><label>Site web</label><input type="text" id="f-site"></div>
@@ -500,7 +504,8 @@ const STATUTS = {
   'contacte':        { label: 'Contacté',        color: '#F59E0B' },
   'engage':          { label: 'Engagé',          color: '#8B5CF6' },
   'en-conversation': { label: 'En conversation', color: '#06D6A0' },
-  'qualifie':        { label: 'Qualifié',        color: '#e94560' }
+  'qualifie':        { label: 'Qualifié',        color: '#e94560' },
+  'pas-interessant': { label: 'Pas intéressant', color: '#9CA3AF' }
 };
 
 const COLS = [
@@ -508,7 +513,8 @@ const COLS = [
   { key: 'contacte',        label: 'Contacté',        cls: 'col-contacte' },
   { key: 'engage',          label: 'Engagé',          cls: 'col-engage' },
   { key: 'en-conversation', label: 'En conversation', cls: 'col-en-conversation' },
-  { key: 'qualifie',        label: 'Qualifié',        cls: 'col-qualifie' }
+  { key: 'qualifie',        label: 'Qualifié',        cls: 'col-qualifie' },
+  { key: 'pas-interessant', label: 'Pas intéressant', cls: 'col-pas-interessant' }
 ];
 
 function getSegmentBadge(seg) {
@@ -831,17 +837,40 @@ async function saveProspect() {
     statut: document.getElementById('f-statut').value,
     site: document.getElementById('f-site').value,
     next_contact: document.getElementById('f-next').value || null,
-    notes: document.getElementById('f-notes').value,
-    suivi_par: document.getElementById('f-suivi').value || null
+    notes: document.getElementById('f-notes').value
   };
+  const suiviVal = document.getElementById('f-suivi').value || null;
+  if (suiviVal) data.suivi_par = suiviVal;
   if (!data.nom) return;
 
+  let result;
   if (editingId) {
-    await sb.from('wpe_prospects').update(data).eq('id', editingId);
+    result = await sb.from('wpe_prospects').update(data).eq('id', editingId).select();
+    if (result.error && result.error.message && result.error.message.includes('suivi_par')) {
+      delete data.suivi_par;
+      result = await sb.from('wpe_prospects').update(data).eq('id', editingId).select();
+    }
   } else {
-    await sb.from('wpe_prospects').insert([data]);
+    result = await sb.from('wpe_prospects').insert([data]).select();
+    if (result.error && result.error.message && result.error.message.includes('suivi_par')) {
+      delete data.suivi_par;
+      result = await sb.from('wpe_prospects').insert([data]).select();
+    }
+  }
+  if (result.error) {
+    showToast('Erreur: ' + result.error.message);
+    return;
+  }
+  if (result.data && result.data[0]) {
+    if (editingId) {
+      const idx = prospects.findIndex(p => p.id === editingId);
+      if (idx !== -1) prospects[idx] = result.data[0];
+    } else {
+      prospects.push(result.data[0]);
+    }
   }
   closeModal();
+  renderAll();
   showToast('Enregistré');
 }
 
