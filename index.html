@@ -839,25 +839,16 @@ async function saveProspect() {
     next_contact: document.getElementById('f-next').value || null,
     notes: document.getElementById('f-notes').value
   };
-  const suiviVal = document.getElementById('f-suivi').value || null;
-  if (suiviVal) data.suivi_par = suiviVal;
   if (!data.nom) return;
 
   let result;
   if (editingId) {
     result = await sb.from('wpe_prospects').update(data).eq('id', editingId).select();
-    if (result.error && result.error.message && result.error.message.includes('suivi_par')) {
-      delete data.suivi_par;
-      result = await sb.from('wpe_prospects').update(data).eq('id', editingId).select();
-    }
   } else {
     result = await sb.from('wpe_prospects').insert([data]).select();
-    if (result.error && result.error.message && result.error.message.includes('suivi_par')) {
-      delete data.suivi_par;
-      result = await sb.from('wpe_prospects').insert([data]).select();
-    }
   }
   if (result.error) {
+    alert('Erreur sauvegarde: ' + result.error.message);
     showToast('Erreur: ' + result.error.message);
     return;
   }
