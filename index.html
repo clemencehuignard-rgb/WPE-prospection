@@ -728,11 +728,11 @@ async function quickStatusChange(id, e) {
   const next = STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)];
   if (next === p.statut) return;
   const { error } = await sb.from('wpe_prospects').update({ statut: next }).eq('id', id);
-  if (!error) {
-    p.statut = next;
-    renderAll();
-    showToast(STATUTS[next].label);
-  }
+  if (error) { alert('Erreur statut: ' + error.message); return; }
+  const { data: fresh } = await sb.from('wpe_prospects').select('*').order('created_at');
+  if (fresh) { prospects = fresh; }
+  renderAll();
+  showToast(STATUTS[next].label);
 }
 
 function getNextLabel(statut) {
@@ -845,14 +845,14 @@ async function saveProspect() {
     if (editingId) {
       const { error } = await sb.from('wpe_prospects').update(data).eq('id', editingId);
       if (error) { alert('Erreur update: ' + error.message); return; }
-      const idx = prospects.findIndex(p => p.id === editingId);
-      if (idx !== -1) Object.assign(prospects[idx], data);
     } else {
-      const { data: rows, error } = await sb.from('wpe_prospects').insert([data]).select();
+      const { error } = await sb.from('wpe_prospects').insert([data]);
       if (error) { alert('Erreur insert: ' + error.message); return; }
-      if (rows && rows[0]) prospects.push(rows[0]);
     }
     closeModal();
+    // Recharger toutes les données depuis Supabase
+    const { data: fresh } = await sb.from('wpe_prospects').select('*').order('created_at');
+    if (fresh) { prospects = fresh; }
     renderAll();
     showToast('Enregistré');
   } catch(e) {
@@ -863,8 +863,12 @@ async function saveProspect() {
 async function deleteProspect() {
   if (!editingId) return;
   if (confirm('Supprimer ce prospect ?')) {
-    await sb.from('wpe_prospects').delete().eq('id', editingId);
+    const { error } = await sb.from('wpe_prospects').delete().eq('id', editingId);
+    if (error) { alert('Erreur suppression: ' + error.message); return; }
     closeModal();
+    const { data: fresh } = await sb.from('wpe_prospects').select('*').order('created_at');
+    if (fresh) { prospects = fresh; }
+    renderAll();
     showToast('Supprimé');
   }
 }
