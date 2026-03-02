@@ -824,45 +824,40 @@ function closeModal() {
 }
 
 async function saveProspect() {
-  const data = {
-    nom: document.getElementById('f-nom').value,
-    segment: document.getElementById('f-segment').value,
-    pays: document.getElementById('f-pays').value,
-    contact: document.getElementById('f-contact').value,
-    email: document.getElementById('f-email').value,
-    tel: document.getElementById('f-tel').value,
-    linkedin: document.getElementById('f-linkedin').value,
-    score: parseInt(document.getElementById('f-score').value) || 0,
-    tier: document.getElementById('f-tier').value,
-    statut: document.getElementById('f-statut').value,
-    site: document.getElementById('f-site').value,
-    next_contact: document.getElementById('f-next').value || null,
-    notes: document.getElementById('f-notes').value
-  };
-  if (!data.nom) return;
+  try {
+    const data = {
+      nom: document.getElementById('f-nom').value,
+      segment: document.getElementById('f-segment').value,
+      pays: document.getElementById('f-pays').value,
+      contact: document.getElementById('f-contact').value,
+      email: document.getElementById('f-email').value,
+      tel: document.getElementById('f-tel').value,
+      linkedin: document.getElementById('f-linkedin').value,
+      score: parseInt(document.getElementById('f-score').value) || 0,
+      tier: document.getElementById('f-tier').value,
+      statut: document.getElementById('f-statut').value,
+      site: document.getElementById('f-site').value,
+      next_contact: document.getElementById('f-next').value || null,
+      notes: document.getElementById('f-notes').value
+    };
+    if (!data.nom) return;
 
-  let result;
-  if (editingId) {
-    result = await sb.from('wpe_prospects').update(data).eq('id', editingId).select();
-  } else {
-    result = await sb.from('wpe_prospects').insert([data]).select();
-  }
-  if (result.error) {
-    alert('Erreur sauvegarde: ' + result.error.message);
-    showToast('Erreur: ' + result.error.message);
-    return;
-  }
-  if (result.data && result.data[0]) {
     if (editingId) {
+      const { error } = await sb.from('wpe_prospects').update(data).eq('id', editingId);
+      if (error) { alert('Erreur update: ' + error.message); return; }
       const idx = prospects.findIndex(p => p.id === editingId);
-      if (idx !== -1) prospects[idx] = result.data[0];
+      if (idx !== -1) Object.assign(prospects[idx], data);
     } else {
-      prospects.push(result.data[0]);
+      const { data: rows, error } = await sb.from('wpe_prospects').insert([data]).select();
+      if (error) { alert('Erreur insert: ' + error.message); return; }
+      if (rows && rows[0]) prospects.push(rows[0]);
     }
+    closeModal();
+    renderAll();
+    showToast('Enregistré');
+  } catch(e) {
+    alert('Erreur JS: ' + e.message);
   }
-  closeModal();
-  renderAll();
-  showToast('Enregistré');
 }
 
 async function deleteProspect() {
