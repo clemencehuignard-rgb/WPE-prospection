@@ -170,6 +170,30 @@
   .contact-link { color: #e94560; text-decoration: none; font-size: 11px; }
   .contact-link:hover { text-decoration: underline; }
   .no-contacts { text-align: center; color: #ccc; font-size: 12px; padding: 40px 0; }
+
+  /* BUDGET TAB */
+  .budget-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .budget-metric { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid #e0e0e0; text-align: center; }
+  .budget-metric .bm-val { font-size: 24px; font-weight: 700; color: #2c2c2c; }
+  .budget-metric .bm-val.green { color: #059669; }
+  .budget-metric .bm-val.red { color: #e94560; }
+  .budget-metric .bm-val.blue { color: #2563EB; }
+  .budget-metric .bm-lbl { font-size: 11px; color: #888; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .budget-table { background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e0e0e0; }
+  .budget-table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr; padding: 12px 16px; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e0e0e0; background: #fafafa; }
+  .budget-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr; padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f0f0f0; align-items: center; transition: background .15s; cursor: pointer; }
+  .budget-row:hover { background: #fef7f8; }
+  .budget-row .ca-val { font-weight: 700; }
+  .budget-row .ca-val.has-value { color: #059669; }
+  .budget-total-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr; padding: 14px 16px; font-size: 13px; font-weight: 700; background: #f8f9fc; border-top: 2px solid #e0e0e0; }
+  .budget-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .budget-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #06D6A0, #059669); transition: width .3s; }
+  .budget-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .budget-card { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid #e0e0e0; }
+  .budget-card h3 { font-size: 13px; color: #e94560; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .budget-status-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 12px; border-bottom: 1px solid #f0f0f0; }
+  .budget-status-row:last-child { border-bottom: none; }
+
   #cdn-error { display: none; }
   #cdn-error code { background: #f0f0f0; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 </style>
@@ -285,6 +309,7 @@ create policy "public_all" on prospects for all using (true) with check (true);
   <div class="tab active" onclick="switchTab('kanban', this)">Pipeline</div>
   <div class="tab" onclick="switchTab('liste', this)">Liste</div>
   <div class="tab" onclick="switchTab('contacts', this)">Contacts</div>
+  <div class="tab" onclick="switchTab('budget', this)">Budget</div>
   <div class="tab" onclick="switchTab('templates', this)">Templates Email</div>
 </div>
 
@@ -320,6 +345,20 @@ create policy "public_all" on prospects for all using (true) with check (true);
       <div>Contact</div><div>Entreprise</div><div>Email</div><div>Téléphone</div><div>LinkedIn</div><div>Statut</div><div>Action</div>
     </div>
     <div id="contact-rows"></div>
+  </div>
+</div>
+
+<!-- BUDGET -->
+<div id="panel-budget" class="panel">
+  <div class="section-title">Budget Prévisionnel 2026</div>
+  <div class="budget-metrics" id="budget-metrics"></div>
+  <div class="budget-summary" id="budget-summary"></div>
+  <div class="budget-table">
+    <div class="budget-table-header">
+      <div>Entreprise</div><div>Statut</div><div>Tier</div><div>CA Devis</div><div>CA Prévisionnel</div><div>Notes</div>
+    </div>
+    <div id="budget-rows"></div>
+    <div id="budget-total-row"></div>
   </div>
 </div>
 
@@ -453,6 +492,8 @@ Clémence Huignard — WPE Solutions</div>
         </select>
       </div>
       <div class="field"><label>Date prochain contact</label><input type="date" id="f-next"></div>
+      <div class="field"><label>CA Devis (€)</label><input type="number" id="f-ca-devis" min="0" step="100" value="0"></div>
+      <div class="field"><label>CA Prévisionnel (€)</label><input type="number" id="f-ca-previsionnel" min="0" step="100" value="0"></div>
       <div class="field full"><label>Notes / Historique</label><textarea id="f-notes" rows="3"></textarea></div>
     </div>
     <div class="modal-btns">
@@ -779,7 +820,127 @@ function renderContacts() {
   });
 }
 
-function renderAll() { renderKanban(); renderList(); renderContacts(); updateStats(); }
+function renderBudget() {
+  const metricsEl = document.getElementById('budget-metrics');
+  const summaryEl = document.getElementById('budget-summary');
+  const rowsEl = document.getElementById('budget-rows');
+  const totalEl = document.getElementById('budget-total-row');
+  if (!metricsEl) return;
+
+  // Filtrer les prospects avec du budget ou en statut actif
+  const activeStatuts = ['engage', 'en-conversation', 'qualifie'];
+  const budgetProspects = prospects.filter(p =>
+    (p.ca_devis && p.ca_devis > 0) || (p.ca_previsionnel && p.ca_previsionnel > 0) || activeStatuts.includes(p.statut)
+  ).sort((a, b) => (b.ca_previsionnel || 0) - (a.ca_previsionnel || 0));
+
+  // Calculs
+  const totalDevis = prospects.reduce((s, p) => s + (parseFloat(p.ca_devis) || 0), 0);
+  const totalPrev = prospects.reduce((s, p) => s + (parseFloat(p.ca_previsionnel) || 0), 0);
+  const nbProjets = budgetProspects.length;
+  const tauxConv = totalDevis > 0 ? Math.round((totalPrev / totalDevis) * 100) : 0;
+
+  // Répartition par statut
+  const byStatut = {};
+  activeStatuts.forEach(st => { byStatut[st] = { devis: 0, prev: 0, count: 0 }; });
+  budgetProspects.forEach(p => {
+    const st = activeStatuts.includes(p.statut) ? p.statut : 'autre';
+    if (!byStatut[st]) byStatut[st] = { devis: 0, prev: 0, count: 0 };
+    byStatut[st].devis += parseFloat(p.ca_devis) || 0;
+    byStatut[st].prev += parseFloat(p.ca_previsionnel) || 0;
+    byStatut[st].count++;
+  });
+
+  // Répartition par tier
+  const byTier = { '1': { devis: 0, prev: 0, count: 0 }, '2': { devis: 0, prev: 0, count: 0 }, '3': { devis: 0, prev: 0, count: 0 } };
+  budgetProspects.forEach(p => {
+    const t = p.tier || '2';
+    if (byTier[t]) {
+      byTier[t].devis += parseFloat(p.ca_devis) || 0;
+      byTier[t].prev += parseFloat(p.ca_previsionnel) || 0;
+      byTier[t].count++;
+    }
+  });
+
+  const fmt = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+
+  // Métriques
+  metricsEl.innerHTML = `
+    <div class="budget-metric"><div class="bm-val blue">${fmt(totalDevis)}</div><div class="bm-lbl">Total CA Devis</div></div>
+    <div class="budget-metric"><div class="bm-val green">${fmt(totalPrev)}</div><div class="bm-lbl">Total CA Prévisionnel</div></div>
+    <div class="budget-metric"><div class="bm-val">${nbProjets}</div><div class="bm-lbl">Projets actifs</div></div>
+    <div class="budget-metric"><div class="bm-val ${tauxConv > 50 ? 'green' : 'red'}">${tauxConv}%</div><div class="bm-lbl">Taux conversion devis→prévi</div></div>
+  `;
+
+  // Summary cards
+  const statutLabels = { 'engage': 'Projet en cours', 'en-conversation': 'En conversation', 'qualifie': 'Qualifié' };
+  const statutColors = { 'engage': '#8B5CF6', 'en-conversation': '#06D6A0', 'qualifie': '#e94560' };
+  const tierLabels = { '1': 'Tier 1 — Prioritaire', '2': 'Tier 2 — Secondaire', '3': 'Tier 3 — Faible' };
+  const tierColors = { '1': '#06D6A0', '2': '#F59E0B', '3': '#EF4444' };
+
+  summaryEl.innerHTML = `
+    <div class="budget-card">
+      <h3>Par Statut</h3>
+      ${activeStatuts.map(st => {
+        const d = byStatut[st] || { devis: 0, prev: 0, count: 0 };
+        return `<div class="budget-status-row">
+          <span><span class="status-dot" style="background:${statutColors[st]}"></span> ${statutLabels[st]} (${d.count})</span>
+          <span style="font-weight:700;color:${statutColors[st]}">${fmt(d.prev)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="budget-card">
+      <h3>Par Tier</h3>
+      ${['1','2','3'].map(t => {
+        const d = byTier[t];
+        return `<div class="budget-status-row">
+          <span><span class="tier-badge t${t}" style="float:none">${tierLabels[t]}</span> (${d.count})</span>
+          <span style="font-weight:700;color:${tierColors[t]}">${fmt(d.prev)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  // Tableau détaillé
+  rowsEl.innerHTML = '';
+  if (budgetProspects.length === 0) {
+    rowsEl.innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:12px;">Aucun projet avec budget — Ajoutez un CA devis ou prévisionnel dans la fiche client</div>';
+  } else {
+    budgetProspects.forEach(p => {
+      const s = STATUTS[p.statut] || STATUTS['a-contacter'];
+      const devis = parseFloat(p.ca_devis) || 0;
+      const prev = parseFloat(p.ca_previsionnel) || 0;
+      const pct = devis > 0 ? Math.min(Math.round((prev / devis) * 100), 100) : (prev > 0 ? 100 : 0);
+      const div = document.createElement('div');
+      div.className = 'budget-row';
+      div.onclick = () => openModal(p.id);
+      div.innerHTML = `
+        <div><strong>${escHtml(p.nom)}</strong></div>
+        <div><span class="status-dot dot-${p.statut}"></span>${s.label}</div>
+        <div><span class="tier-badge t${p.tier}" style="float:none">T${p.tier}</span></div>
+        <div class="ca-val ${devis > 0 ? 'has-value' : ''}" style="${devis > 0 ? 'color:#2563EB' : 'color:#ccc'}">${devis > 0 ? fmt(devis) : '—'}</div>
+        <div class="ca-val ${prev > 0 ? 'has-value' : ''}">${prev > 0 ? fmt(prev) : '—'}
+          ${devis > 0 ? `<div class="budget-bar"><div class="budget-bar-fill" style="width:${pct}%"></div></div>` : ''}
+        </div>
+        <div style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml((p.notes || '').substring(0, 60))}</div>
+      `;
+      rowsEl.appendChild(div);
+    });
+  }
+
+  // Total row
+  totalEl.innerHTML = `
+    <div class="budget-total-row">
+      <div>TOTAL (${budgetProspects.length} projets)</div>
+      <div></div>
+      <div></div>
+      <div style="color:#2563EB">${fmt(totalDevis)}</div>
+      <div style="color:#059669">${fmt(totalPrev)}</div>
+      <div></div>
+    </div>
+  `;
+}
+
+function renderAll() { renderKanban(); renderList(); renderContacts(); renderBudget(); updateStats(); }
 
 // -- MODAL --
 function openModal(id) {
@@ -803,6 +964,8 @@ function openModal(id) {
     document.getElementById('f-suivi').value = p.suivi_par || '';
     document.getElementById('f-next').value = p.next_contact || '';
     document.getElementById('f-notes').value = p.notes || '';
+    document.getElementById('f-ca-devis').value = p.ca_devis || 0;
+    document.getElementById('f-ca-previsionnel').value = p.ca_previsionnel || 0;
     btnDel.style.display = 'block';
   } else {
     document.getElementById('modal-title').textContent = 'Nouveau prospect';
@@ -813,6 +976,8 @@ function openModal(id) {
     document.getElementById('f-score').value = 0;
     document.getElementById('f-tier').value = '2';
     document.getElementById('f-statut').value = 'a-contacter';
+    document.getElementById('f-ca-devis').value = 0;
+    document.getElementById('f-ca-previsionnel').value = 0;
     btnDel.style.display = 'none';
   }
   document.getElementById('modal').classList.add('open');
@@ -838,7 +1003,9 @@ async function saveProspect() {
       statut: document.getElementById('f-statut').value,
       site: document.getElementById('f-site').value,
       next_contact: document.getElementById('f-next').value || null,
-      notes: document.getElementById('f-notes').value
+      notes: document.getElementById('f-notes').value,
+      ca_devis: parseFloat(document.getElementById('f-ca-devis').value) || 0,
+      ca_previsionnel: parseFloat(document.getElementById('f-ca-previsionnel').value) || 0
     };
     if (!data.nom) return;
 
