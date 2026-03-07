@@ -831,7 +831,12 @@ function renderBudget() {
   const activeStatuts = ['engage', 'en-conversation', 'qualifie'];
   const budgetProspects = prospects.filter(p =>
     (p.ca_devis && p.ca_devis > 0) || (p.ca_previsionnel && p.ca_previsionnel > 0) || activeStatuts.includes(p.statut)
-  ).sort((a, b) => (b.ca_previsionnel || 0) - (a.ca_previsionnel || 0));
+  ).sort((a, b) => {
+    const aDevis = parseFloat(a.ca_devis) || 0, bDevis = parseFloat(b.ca_devis) || 0;
+    const aPrev = parseFloat(a.ca_previsionnel) || 0, bPrev = parseFloat(b.ca_previsionnel) || 0;
+    if (bDevis !== aDevis) return bDevis - aDevis;
+    return bPrev - aPrev;
+  });
 
   // Calculs
   const totalDevis = prospects.reduce((s, p) => s + (parseFloat(p.ca_devis) || 0), 0);
